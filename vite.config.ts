@@ -9,23 +9,24 @@ export default defineConfig({
     Icons({
       compiler: "svelte",
     }),
+    // ardupilot_vg to accomodate github pages
     viteStaticCopy({
       targets: [
         {
           src: "node_modules/cesium/Build/Cesium/Workers/*",
-          dest: "Workers",
+          dest: "ardupilot_vg/Workers",
         },
         {
           src: "node_modules/cesium/Build/Cesium/ThirdParty/*",
-          dest: "ThirdParty",
+          dest: "ardupilot_vg/ThirdParty",
         },
         {
           src: "node_modules/cesium/Build/Cesium/Assets/*",
-          dest: "Assets",
+          dest: "ardupilot_vg/Assets",
         },
         {
           src: "node_modules/cesium/Build/Cesium/Widgets/*",
-          dest: "Widgets",
+          dest: "ardupilot_vg/Widgets",
         },
       ],
     }),
