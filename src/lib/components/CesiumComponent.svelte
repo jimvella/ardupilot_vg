@@ -1,5 +1,6 @@
 <script lang="ts">
-  window.CESIUM_BASE_URL = "/";
+  // Accomodate github pages
+  window.CESIUM_BASE_URL = "/ardupilot_vg";
   import {
     Cartesian3,
     createOsmBuildingsAsync,
