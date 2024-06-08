@@ -15,8 +15,11 @@ const config = {
     // See https://kit.svelte.dev/docs/adapters for more information about adapters.
     adapter: adapter({
       //fallback: "index.html",
-      pages: "build",
-      assets: "build",
+      //pages: "build",
+      //assets: "build",
+      // github pages
+      pages: "docs",
+      assets: "docs",
       fallback: undefined,
       precompress: false,
       strict: true,
