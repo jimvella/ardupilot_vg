@@ -365,7 +365,8 @@
           ]),
           position: sampledPositionProperty,
           model: {
-            uri: "/Cesium_Air.gltf",
+            // Github pages prefix
+            uri: "/ardupilot_vg/Cesium_Air.gltf",
             minimumPixelSize: 64,
             maximumScale: 100,
             scale: 1,
