@@ -12,7 +12,6 @@
     LagrangePolynomialApproximation,
     Matrix3,
     Matrix4,
-    PolylineGlowMaterialProperty,
     PolylineGraphics,
     Quaternion,
     SampledPositionProperty,
@@ -25,80 +24,14 @@
     Math as CesiumMath,
     type Viewer,
     HeadingPitchRange,
-    getTimestamp,
   } from "cesium";
   import type { Writable } from "svelte/store";
   import { onMount } from "svelte";
-
-  /*
-    Test flight objectives
-    - Establish which sensor is sideslip
-      * wings level rudder turns
-      * accelerate and decelerate without changing attitude
-    - Establish Vs for Vg diagram
-      * wings level stall
-    - Test wind estimation without airspeed.
-      * Fly straight and level for a few sec, turn 90 degrees 
-        and fly straight and level for a few sec.
-  */
+  import { OrderedExponentialFilter } from "./filters/ExponentialFilter";
 
   let ardupilotBinParserworker: Worker | undefined = undefined;
 
   let state = {};
-
-  class ExponentialFilter {
-    smoothingFactor: number;
-    lastValue: number | undefined = undefined;
-
-    constructor(smoothingFactor: number) {
-      this.smoothingFactor = smoothingFactor;
-    }
-
-    apply(i: number): number {
-      if (this.lastValue != undefined) {
-        const result =
-          this.smoothingFactor * i +
-          (1 - this.smoothingFactor) * this.lastValue;
-        this.lastValue = result;
-        return result;
-      } else {
-        this.lastValue = i;
-        return this.lastValue;
-      }
-    }
-
-    // Convinience function
-    applyArray(array: { x: number; y: number }[]): { x: number; y: number }[] {
-      return array.map((i) => {
-        return { x: i.x, y: this.apply(i.y) };
-      });
-    }
-  }
-
-  class OrderedExponentialFilter {
-    filters: ExponentialFilter[];
-
-    constructor(smoothingFactor: number, order: number) {
-      this.filters = Array(order)
-        .fill()
-        .map((i) => new ExponentialFilter(smoothingFactor));
-    }
-
-    apply(i: number): number {
-      let result = i;
-      this.filters.forEach((f) => {
-        result = f.apply(result);
-      });
-      return result;
-    }
-
-    // Convinience function
-    applyArray(array: { x: number; y: number }[]): { x: number; y: number }[] {
-      return array.map((i) => {
-        return { x: i.x, y: this.apply(i.y) };
-      });
-    }
-  }
 
   const loadArdupilotData = (data, length, dataAtIndex) => {
     console.log("loading ardupilot data");
@@ -130,13 +63,6 @@
     let start: JulianDate;
     let stop: JulianDate;
 
-    let velocityEstimator = new DiscreteDerivativeEstimator();
-    let accelerationEstimator = new DiscreteDerivativeEstimator();
-
-    const rotationFromDatumToUp = Transforms.headingPitchRollQuaternion(
-      Cartesian3.ZERO,
-      HeadingPitchRoll.fromDegrees(180, 0, 0)
-    );
     const velocityRotationFromDatum = Transforms.headingPitchRollQuaternion(
       Cartesian3.ZERO,
       HeadingPitchRoll.fromDegrees(0, 90, 0)
@@ -152,16 +78,9 @@
     let zmax = 0;
 
     yieldingLoop(
-      //trackPoints.length,
       length,
       100, // chunk
       (i) => {
-        // const p = dataAtIndex(i);
-
-        // if (p == undefined) {
-        //   console.log("p undefined");
-        //   return;
-        // }
         const p = {};
         p.time = JulianDate.fromDate(
           new Date(
@@ -182,17 +101,17 @@
         }
         stop = p.time;
 
-        //points.push(p);
-        // Extended Kalman Filter (EKF) Velocity estimate
-        const vn = data.messages["XKF1[0]"].VN[i];
-        const ve = data.messages["XKF1[0]"].VE[i];
-        const vd = data.messages["XKF1[0]"].VD[i];
-
         Transforms.eastNorthUpToFixedFrame(
           p.position,
           Ellipsoid.WGS84,
           eastNorthUpToFixedFrameAtPosition
         );
+
+        // Extended Kalman Filter (EKF) Velocity estimate
+        const vn = data.messages["XKF1[0]"].VN[i];
+        const ve = data.messages["XKF1[0]"].VE[i];
+        const vd = data.messages["XKF1[0]"].VD[i];
+
         const vVector = Matrix4.multiplyByPointAsVector(
           eastNorthUpToFixedFrameAtPosition,
           Cartesian3.fromElements(ve, vn, -vd),
@@ -200,6 +119,7 @@
         );
         sampledVelocityProperty.addSample(p.time, vVector);
 
+        // Extended Kalman Filter (EKF) Wind estimate
         const vwn = data.messages["XKF2[0]"].VWN[i];
         const vwe = data.messages["XKF2[0]"].VWE[i];
         const wVector = Matrix4.multiplyByPointAsVector(
@@ -209,6 +129,7 @@
         );
         sampledWindProperty.addSample(p.time, wVector);
 
+        // Extended Kalman Filter (EKF) Attitude estimate
         const roll = data.messages["XKF1[0]"].Roll[i];
         const pitch = data.messages["XKF1[0]"].Pitch[i];
         const yaw = data.messages["XKF1[0]"].Yaw[i];
@@ -219,35 +140,13 @@
         );
         sampledOrientationProperty.addSample(p.time, orientation);
 
-        // const velocity = velocityEstimator.apply({
-        //   vector: p.position,
-        //   time: p.time,
-        // });
-        // const velocity = {
-        //   vector: vVector,
-        //   time: p.time
-        // }
-        //velocities.push(velocity);
-        //if (velocity) {
-
-        //}
-
+        // IMU Acceleration measurments
         // https://ardupilot.org/copter/docs/logmessages.html#imu
+        // Exp filter since the data is noisy (engine vibration?)
         const accX = accXFilter.apply(data.messages["IMU[2]"].AccX[i * 2]);
         const accY = accYFilter.apply(data.messages["IMU[2]"].AccY[i * 2]);
         const accZ = accZFilter.apply(data.messages["IMU[2]"].AccZ[i * 2]);
 
-        // TODO - also needs to be roated by attitude
-        // const aVector = Matrix4.multiplyByPointAsVector(
-        //   eastNorthUpToFixedFrameAtPosition,
-        //   Cartesian3.fromElements(
-        //     ,
-        //     accYFilter.apply(accY),
-        //     accZFilter.apply(accZ)
-        //   ),
-        //   new Cartesian3()
-        // );
-        // //const a2 = rotate(aVector, [orientation]);
         const aVector = rotate(
           Cartesian3.fromElements(
             // Not sure about slip and forward / aft acceleration
@@ -258,34 +157,6 @@
           [orientation]
         );
         sampledAccelerationProperty.addSample(p.time, aVector);
-
-        // const acceleration = .apply(velocity);
-        const acceleration = undefined;
-
-        // if (acceleration) {
-        //   // Add 1g vector
-        //   const upQuarternion = Transforms.headingPitchRollQuaternion(
-        //     p.position,
-        //     HeadingPitchRoll.fromDegrees(0, 90, 0)
-        //   );
-        //   const gVector = rotate(Cartesian3.fromElements(9.8, 0, 0), [
-        //     upQuarternion,
-        //     rotationFromDatumToUp,
-        //   ]);
-        //   acceleration.vector = Cartesian3.add(
-        //     acceleration.vector,
-        //     gVector,
-        //     acceleration.vector
-        //   );
-        // }
-
-        // accelerations.push(acceleration);
-        // if (acceleration) {
-        //   sampledAccelerationProperty.addSample(
-        //     points[i - 2].time,
-        //     acceleration.vector
-        //   );
-        // }
 
         // Mark this location with a red point.
         const pointEntity = viewer.entities.add({
@@ -303,52 +174,6 @@
           });
         }
 
-        // Mark vectors
-        // if (velocity) {
-        //   const velocityEntity = viewer.entities.add({
-        //     position: points[i - 1].position,
-        //     polyline: new PolylineGraphics({
-        //       positions: new CallbackProperty((t) => {
-        //         return [
-        //           points[i - 1].position,
-        //           Cartesian3.add(
-        //             points[i - 1].position,
-        //             velocity.vector,
-        //             new Cartesian3()
-        //           ),
-        //         ];
-        //       }, true),
-        //       width: 3,
-        //       material: Color.RED,
-        //       // Wont render at all if we start with false
-        //       show: true,
-        //     }),
-        //   });
-        //   vectorEntities.push(velocityEntity);
-        // }
-
-        // if (acceleration) {
-        //   const accelerationEntity = viewer.entities.add({
-        //     position: points[i - 2].position,
-        //     polyline: new PolylineGraphics({
-        //       positions: new CallbackProperty((t) => {
-        //         return [
-        //           points[i - 2].position,
-        //           Cartesian3.add(
-        //             points[i - 2].position,
-        //             acceleration.vector,
-        //             new Cartesian3()
-        //           ),
-        //         ];
-        //       }, true),
-        //       width: 3,
-        //       material: Color.YELLOW,
-        //       show: true,
-        //     }),
-        //   });
-        //   vectorEntities.push(accelerationEntity);
-        // }
-
         sampledPositionProperty.addSample(p.time, p.position);
       },
       () => {
@@ -364,7 +189,6 @@
             : // Accomodate Github pages
               "/ardupilot_vg/Cesium_Air.gltf";
 
-        let rotationScratch: Matrix3 = new Matrix3();
         const airplaneEntity = viewer.entities.add({
           availability: new TimeIntervalCollection([
             new TimeInterval({ start: start, stop: stop }),
@@ -384,49 +208,6 @@
             //silhouetteColor: Color.fromAlpha(color, 1),
             //silhouetteSize: 1,
           },
-          // orientation: new CallbackProperty((t) => {
-          //   const p = sampledPositionProperty.getValue(t);
-          //   const v = sampledVelocityProperty.getValue(t);
-          //   const a = sampledAccelerationProperty.getValue(t);
-
-          //   try {
-          //     if (p && v && a) {
-          //       Cartesian3.normalize(v, v);
-
-          //       Transforms.rotationMatrixFromPositionVelocity(
-          //         p,
-          //         v,
-          //         Ellipsoid.WGS84,
-          //         rotationScratch
-          //       );
-          //       let result = Quaternion.fromRotationMatrix(
-          //         rotationScratch,
-          //         new Quaternion()
-          //       );
-
-          //       // Roll axis rotation
-          //       // vector at right angles to v and a
-          //       let aCrossV = Cartesian3.cross(a, v, new Cartesian3());
-          //       let normal = Ellipsoid.WGS84.geodeticSurfaceNormal(
-          //         p,
-          //         new Cartesian3()
-          //       );
-          //       let angle =
-          //         (Cartesian3.angleBetween(aCrossV, normal) * 180) / Math.PI;
-
-          //       let rollQuarternion = Quaternion.fromHeadingPitchRoll(
-          //         HeadingPitchRoll.fromDegrees(0, 0, 90 - angle)
-          //       );
-          //       result = Quaternion.multiply(result, rollQuarternion, result);
-          //       return result;
-          //     } else {
-          //       return undefined;
-          //     }
-          //   } catch (error) {
-          //     console.log("error with orientation", error);
-          //     return undefined;
-          //   }
-          // }, false),
           orientation: sampledOrientationProperty,
           path: {
             //resolution: 1,
@@ -557,9 +338,6 @@
                   position,
                   HeadingPitchRoll.fromDegrees(Number(windDir), 0, 0)
                 ),
-                // Quaternion.fromHeadingPitchRoll(
-                //   HeadingPitchRoll.fromDegrees(Number(windDir + 90), 0, 0)
-                // ),
               ],
               wind
             );
@@ -588,9 +366,6 @@
         updateVgVectors();
       }
     );
-
-    console.log("zmin", zmin);
-    console.log("zmax", zmax);
   };
 
   onMount(async () => {
@@ -630,7 +405,6 @@
         loadArdupilotData(
           state,
           state.messages["POS"].time_boot_ms.length,
-          //20000,
           (i) => i
         );
       } else if (event.data.messageType) {
@@ -646,46 +420,6 @@
       }
     };
   });
-
-  /*
-    Takes points either side and finds the tangent / derivative
-  */
-  class DiscreteDerivativeEstimator {
-    nMinus2: { vector: Cartesian3; time: JulianDate } | undefined;
-    nMinus1: { vector: Cartesian3; time: JulianDate } | undefined;
-
-    public constructor() {}
-
-    apply(n: { vector: Cartesian3; time: JulianDate } | undefined) {
-      if (n) {
-        let result = undefined;
-
-        if (n && this.nMinus1 && this.nMinus2) {
-          // tanget at n - 1
-          let v = Cartesian3.subtract(
-            n.vector,
-            this.nMinus2.vector,
-            new Cartesian3()
-          );
-          v = Cartesian3.divideByScalar(
-            v,
-            (JulianDate.toDate(n.time).getTime() -
-              JulianDate.toDate(this.nMinus2.time).getTime()) /
-              1000,
-            v
-          );
-
-          result = { vector: v, time: this.nMinus1.time };
-        }
-
-        this.nMinus2 = this.nMinus1;
-        this.nMinus1 = n;
-        return result;
-      } else {
-        return undefined;
-      }
-    }
-  }
 
   function yieldingLoop(
     count: number,
@@ -739,378 +473,6 @@
   let velocities: ({ vector: Cartesian3; time: JulianDate } | undefined)[] = [];
   let accelerations: ({ vector: Cartesian3; time: JulianDate } | undefined)[] =
     [];
-
-  const loadTrack = (data, length, dataAtIndex) => {
-    console.log("processing");
-    // const trackPoints = gpx
-    //   .getElementsByTagName("gpx")[0]
-    //   .getElementsByTagName("trk")[0]
-    //   .getElementsByTagName("trkseg")[0]
-    //   .getElementsByTagName("trkpt");
-
-    const sampledPositionProperty = new SampledPositionProperty();
-    const sampledVelocityProperty = new SampledProperty(Cartesian3);
-    sampledVelocityProperty.setInterpolationOptions({
-      interpolationAlgorithm: LagrangePolynomialApproximation,
-      interpolationDegree: 5,
-    });
-    const sampledAccelerationProperty = new SampledProperty(Cartesian3);
-    sampledAccelerationProperty.setInterpolationOptions({
-      interpolationAlgorithm: LagrangePolynomialApproximation,
-      interpolationDegree: 5,
-    });
-
-    let start: JulianDate;
-    let stop: JulianDate;
-
-    let velocityEstimator = new DiscreteDerivativeEstimator();
-    let accelerationEstimator = new DiscreteDerivativeEstimator();
-
-    const rotationFromDatumToUp = Transforms.headingPitchRollQuaternion(
-      Cartesian3.ZERO,
-      HeadingPitchRoll.fromDegrees(180, 0, 0)
-    );
-
-    yieldingLoop(
-      //trackPoints.length,
-      length,
-      10, // chunk
-      (i) => {
-        const p = dataAtIndex(i);
-
-        if (p == undefined) {
-          console.log("p undefined");
-          return;
-        }
-
-        samples = samples + 1;
-
-        if (start == undefined) {
-          start = p.time;
-        }
-        stop = p.time;
-        points.push(p);
-
-        // const tp = trackPoints[i];
-        // const lat = tp.getAttribute("lat");
-        // const lon = tp.getAttribute("lon");
-
-        // // Do we need to convert gps height?
-        // //https://cesium.com/learn/cesiumjs-learn/cesiumjs-flight-tracker/
-        // const ele = tp.getElementsByTagName("ele")[0].textContent;
-        // const time = tp.getElementsByTagName("time")[0].textContent;
-        // samples = samples + 1;
-
-        // const date = JulianDate.fromDate(new Date(time));
-        // if (start == undefined) {
-        //   start = date;
-        // }
-        // stop = date;
-
-        // const position = Cartesian3.fromDegrees(
-        //   Number(lon),
-        //   Number(lat),
-        //   Number(ele)
-        // );
-
-        // points.push({
-        //   position: position,
-        //   time: date,
-        // });
-
-        const velocity = velocityEstimator.apply({
-          vector: p.position,
-          time: p.time,
-        });
-        velocities.push(velocity);
-        if (velocity) {
-          sampledVelocityProperty.addSample(
-            points[i - 1].time,
-            velocity.vector
-          );
-        }
-
-        const acceleration = accelerationEstimator.apply(velocity);
-
-        if (acceleration) {
-          // Add 1g vector
-          const upQuarternion = Transforms.headingPitchRollQuaternion(
-            p.position,
-            HeadingPitchRoll.fromDegrees(0, 90, 0)
-          );
-          const gVector = rotate(Cartesian3.fromElements(9.8, 0, 0), [
-            upQuarternion,
-            rotationFromDatumToUp,
-          ]);
-          acceleration.vector = Cartesian3.add(
-            acceleration.vector,
-            gVector,
-            acceleration.vector
-          );
-        }
-
-        accelerations.push(acceleration);
-        if (acceleration) {
-          sampledAccelerationProperty.addSample(
-            points[i - 2].time,
-            acceleration.vector
-          );
-        }
-
-        // Mark this location with a red point.
-        const pointEntity = viewer.entities.add({
-          //description: `First data point at (${lon}, ${lat})`,
-          position: p.position,
-          point: { pixelSize: 10, color: Color.RED },
-          show: showSamples,
-        });
-        sampleEntities.push(pointEntity);
-
-        // Point the camera at the points being loaded in
-        if (i == 1) {
-          viewer.flyTo(pointEntity, {
-            offset: new HeadingPitchRange(Math.PI, 0, 1000),
-          });
-        }
-
-        // Mark vectors
-        if (velocity) {
-          const velocityEntity = viewer.entities.add({
-            position: points[i - 1].position,
-            polyline: new PolylineGraphics({
-              positions: new CallbackProperty((t) => {
-                return [
-                  points[i - 1].position,
-                  Cartesian3.add(
-                    points[i - 1].position,
-                    velocity.vector,
-                    new Cartesian3()
-                  ),
-                ];
-              }, true),
-              width: 3,
-              material: Color.RED,
-              // Wont render at all if we start with false
-              show: true,
-            }),
-          });
-          vectorEntities.push(velocityEntity);
-        }
-
-        if (acceleration) {
-          const accelerationEntity = viewer.entities.add({
-            position: points[i - 2].position,
-            polyline: new PolylineGraphics({
-              positions: new CallbackProperty((t) => {
-                return [
-                  points[i - 2].position,
-                  Cartesian3.add(
-                    points[i - 2].position,
-                    acceleration.vector,
-                    new Cartesian3()
-                  ),
-                ];
-              }, true),
-              width: 3,
-              material: Color.YELLOW,
-              show: true,
-            }),
-          });
-          vectorEntities.push(accelerationEntity);
-        }
-
-        sampledPositionProperty.addSample(p.time, p.position);
-      },
-      () => {
-        if (showVectors == false) {
-          vectorEntities.forEach((i) => {
-            i.show = showVectors;
-          });
-        }
-
-        let rotationScratch: Matrix3 = new Matrix3();
-        const airplaneEntity = viewer.entities.add({
-          availability: new TimeIntervalCollection([
-            new TimeInterval({ start: start, stop: stop }),
-          ]),
-          position: sampledPositionProperty,
-          model: {
-            uri: "/Cesium_Air.gltf",
-            minimumPixelSize: 64,
-            maximumScale: 100,
-            scale: 1,
-            shadows: ShadowMode.ENABLED,
-            imageBasedLightingFactor: Cartesian2.ONE,
-            //color: Color.fromAlpha(color, 1),
-            //colorBlendMode: ColorBlendMode.MIX,
-            //colorBlendAmount: 0.5,
-            //silhouetteColor: Color.fromAlpha(color, 1),
-            //silhouetteSize: 1,
-          },
-          orientation: new CallbackProperty((t) => {
-            const p = sampledPositionProperty.getValue(t);
-            const v = sampledVelocityProperty.getValue(t);
-            const a = sampledAccelerationProperty.getValue(t);
-
-            try {
-              if (p && v && a) {
-                Cartesian3.normalize(v, v);
-
-                Transforms.rotationMatrixFromPositionVelocity(
-                  p,
-                  v,
-                  Ellipsoid.WGS84,
-                  rotationScratch
-                );
-                let result = Quaternion.fromRotationMatrix(
-                  rotationScratch,
-                  new Quaternion()
-                );
-
-                // Roll axis rotation
-                // vector at right angles to v and a
-                let aCrossV = Cartesian3.cross(a, v, new Cartesian3());
-                let normal = Ellipsoid.WGS84.geodeticSurfaceNormal(
-                  p,
-                  new Cartesian3()
-                );
-                let angle =
-                  (Cartesian3.angleBetween(aCrossV, normal) * 180) / Math.PI;
-
-                let rollQuarternion = Quaternion.fromHeadingPitchRoll(
-                  HeadingPitchRoll.fromDegrees(0, 0, 90 - angle)
-                );
-                result = Quaternion.multiply(result, rollQuarternion, result);
-                return result;
-              } else {
-                return undefined;
-              }
-            } catch (error) {
-              console.log("error with orientation", error);
-              return undefined;
-            }
-          }, false),
-          path: {
-            //resolution: 1,
-            // material: new PolylineGlowMaterialProperty({
-            //   glowPower: 0.1,
-            //   color: Color.YELLOW,
-            // }),
-            material: Color.MAGENTA,
-            width: 2,
-            show: showPath,
-          },
-        });
-        airplaneEntity.position.setInterpolationOptions({
-          interpolationAlgorithm: LagrangePolynomialApproximation,
-          interpolationDegree: 5,
-        });
-        entity = airplaneEntity;
-
-        const velocityEntity = viewer.entities.add({
-          position: sampledPositionProperty,
-          polyline: new PolylineGraphics({
-            positions: new CallbackProperty((t) => {
-              const p = sampledPositionProperty.getValue(t);
-              const v = sampledVelocityProperty.getValue(t);
-              if (p && v) {
-                return [p, Cartesian3.add(p, v, new Cartesian3())];
-              } else {
-                return undefined;
-              }
-            }, false),
-            width: 3,
-            material: Color.RED,
-          }),
-        });
-        interpolatedVectorEntities.push(velocityEntity);
-
-        const accelerationEntity = viewer.entities.add({
-          position: sampledPositionProperty,
-          polyline: new PolylineGraphics({
-            positions: new CallbackProperty((t) => {
-              const p = sampledPositionProperty.getValue(t);
-              const v = sampledAccelerationProperty.getValue(t);
-              if (p && v) {
-                return [p, Cartesian3.add(p, v, new Cartesian3())];
-              } else {
-                return undefined;
-              }
-            }, false),
-            width: 3,
-            material: Color.YELLOW,
-          }),
-        });
-        interpolatedVectorEntities.push(accelerationEntity);
-
-        viewer.clock.startTime = start.clone();
-        viewer.clock.stopTime = stop.clone();
-        viewer.clock.currentTime = start.clone();
-
-        viewer.timeline.zoomTo(start, stop);
-        viewer.clock.shouldAnimate = true;
-
-        viewer.trackedEntity = airplaneEntity;
-
-        viewer.clock.onTick.addEventListener((clock) => {
-          const sv = sampledVelocityProperty.getValue(clock.currentTime);
-          if (sv) {
-            velocity = Cartesian3.magnitude(sv);
-          }
-
-          const sg = sampledAccelerationProperty.getValue(clock.currentTime);
-          if (sg) {
-            g = Cartesian3.magnitude(sg);
-          }
-
-          const knotsPerMetersPerSecond = 1.944;
-          const position = airplaneEntity.position.getValue(clock.currentTime);
-          if (position) {
-            let wind = Cartesian3.multiplyByScalar(
-              Cartesian3.UNIT_X,
-              Number(windSpeed) / knotsPerMetersPerSecond,
-              new Cartesian3()
-            );
-
-            wind = rotate(
-              wind,
-              [
-                Transforms.headingPitchRollQuaternion(
-                  position,
-                  HeadingPitchRoll.fromDegrees(Number(windDir), 0, 0)
-                ),
-                // Quaternion.fromHeadingPitchRoll(
-                //   HeadingPitchRoll.fromDegrees(Number(windDir + 90), 0, 0)
-                // ),
-              ],
-              wind
-            );
-
-            if (sv) {
-              const relativeAirflow = Cartesian3.add(
-                sv,
-                wind,
-                new Cartesian3()
-              );
-
-              tas =
-                Cartesian3.magnitude(relativeAirflow) * knotsPerMetersPerSecond;
-            } else {
-              tas = undefined;
-            }
-          } else {
-            tas = undefined;
-          }
-
-          if (tas != undefined && g != undefined) {
-            onUpdate(tas, g / 9.8, clock.currentTime);
-          }
-        });
-
-        updateVgVectors();
-      }
-    );
-  };
 
   export let onUpdate: (v: number, g: number, t: JulianDate) => void = (
     v,

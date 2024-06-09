@@ -40,7 +40,9 @@
     >
       <VgChart {tas} {g} {t} vgSamples={vgVectorStore} />
       VG Chart width (%)
-      <input type="range" min="1" max="100" bind:value={width} />
+      {#if !columns}
+        <input type="range" min="1" max="100" bind:value={width} />
+      {/if}
     </div>
     <div style={columns ? "margin-left: 50%;" : ""}>
       <CesiumVgTracker
@@ -57,4 +59,9 @@
 </div>
 <br />
 <br />
-<a href="ardupilot_datalogger">Flight path logging</a>
+<div style="display: flex; justify-content: center">
+  <p>
+    <a href="ardupilot_datalogger">Flight path logging</a>
+    · <a href="/about">About</a> · James Vella © 2024
+  </p>
+</div>
