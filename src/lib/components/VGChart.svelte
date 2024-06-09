@@ -4,6 +4,7 @@
   import ChartDataLabels from "chartjs-plugin-datalabels";
   import type { Readable } from "svelte/store";
   import { JulianDate } from "cesium";
+  import Accordion from "./Accordion.svelte";
 
   const asiGreen = "#48a95a";
   const asiYellow = "#fbe014";
@@ -369,11 +370,11 @@
     Array<{ tas: number; g: number; t: JulianDate }>
   >;
 
-  let vs = "50";
-  let vno = "120";
-  let vne = "140";
-  let gLimitPositive = "4";
-  let gLimitNegative = "2";
+  let vs = "46";
+  let vno = "139";
+  let vne = "156";
+  let gLimitPositive = "6";
+  let gLimitNegative = "5";
   let showVgSamplesWithinMinutes = "0";
 
   let chart: Chart;
@@ -424,43 +425,62 @@
 
 <ChartComponent {chartBuilder} />
 
-Vs (stall)*
-<input type="text" id="vne" name="vne" size="3" bind:value={vs} /><br />
-Vno (normal operating)
-<input type="text" id="vne" name="vne" size="3" bind:value={vno} /><br />
-Vne (never exceed)
-<input type="text" id="vne" name="vne" size="3" bind:value={vne} /><br />
-g+ max
-<input
-  type="text"
-  id="vne"
-  name="vne"
-  size="3"
-  bind:value={gLimitPositive}
-/><br />
-g- max
-<input
-  type="text"
-  id="vne"
-  name="vne"
-  size="3"
-  bind:value={gLimitNegative}
-/><br />
-<br />
-Show vg samples within
-<input
-  type="text"
-  id="vne"
-  name="vne"
-  size="3"
-  bind:value={showVgSamplesWithinMinutes}
-/>min<br />
-<br />
-<p>
-  Notes:
-  <br /><br />
-  Vs<sub>accelerated</sub> = <span>&#8730;</span>g * Vs<sub
-    >straight and level</sub
-  >
-</p>
-<p>* Vs varies with aircraft weight.</p>
+<Accordion open={true}>
+  <!-- <span slot="head"
+    >This is my header number two, it's quite long so should span multiple lines
+    (if not: please resize the window!)</span
+  > -->
+  <div slot="details">
+    Vs (stall)*
+    <input type="text" id="vne" name="vne" size="3" bind:value={vs} /><br />
+    Vno (normal operating)
+    <input type="text" id="vne" name="vne" size="3" bind:value={vno} /><br />
+    Vne (never exceed)
+    <input type="text" id="vne" name="vne" size="3" bind:value={vne} /><br />
+    g+ max
+    <input
+      type="text"
+      id="vne"
+      name="vne"
+      size="3"
+      bind:value={gLimitPositive}
+    /><br />
+    g- max
+    <input
+      type="text"
+      id="vne"
+      name="vne"
+      size="3"
+      bind:value={gLimitNegative}
+    /><br />
+    <br />
+    <button
+      on:click={() => {
+        vs = "46";
+        vno = "139";
+        vne = "156";
+        gLimitPositive = "6";
+        gLimitNegative = "5";
+      }}>Decathlon preset</button
+    >
+    <br />
+    <button
+      on:click={() => {
+        vs = "56";
+        vno = "136";
+        vne = "158";
+        gLimitPositive = "6";
+        gLimitNegative = "3";
+      }}>FUJI FA200 preset</button
+    >
+    <br />
+    <p>
+      Notes:
+      <br /><br />
+      Vs<sub>accelerated</sub> = <span>&#8730;</span>g * Vs<sub
+        >straight and level</sub
+      >
+    </p>
+    <p>* Vs varies with aircraft weight.</p>
+  </div>
+</Accordion>

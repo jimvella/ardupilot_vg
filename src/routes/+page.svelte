@@ -18,6 +18,9 @@
   //   { tas: 40, g: 1.2, t: JulianDate.fromDate(new Date()) },
   //   { tas: 60, g: 4, t: JulianDate.fromDate(new Date()) },
   // ]);
+
+  let columns = true;
+  let width = 100;
 </script>
 
 <svelte:head>
@@ -25,12 +28,21 @@
   <meta name="description" content="Dynamic VG diagram from aircraft track" />
 </svelte:head>
 <div>
+  <h2>Dynamic VG Diagram from Aicraft Track</h2>
+  <button
+    on:click={() => {
+      columns = !columns;
+    }}>{columns ? "1 column" : "2 columns"}</button
+  >
   <div style="width: 100%;">
-    <h2>Dynamic VG Diagram from Aicraft Track</h2>
-    <div style="width: 50%;  float: left;">
+    <div
+      style={columns ? "width: 50%;  float: left;" : "width: " + width + "%"}
+    >
       <VgChart {tas} {g} {t} vgSamples={vgVectorStore} />
+      VG Chart width (%)
+      <input type="range" min="1" max="100" bind:value={width} />
     </div>
-    <div style="margin-left: 50%; ">
+    <div style={columns ? "margin-left: 50%;" : ""}>
       <CesiumVgTracker
         onUpdate={(_tas, _g, _t) => {
           //console.log("update: " + tas + " " + g);
@@ -43,3 +55,6 @@
     </div>
   </div>
 </div>
+<br />
+<br />
+<a href="ardupilot_datalogger">Flight path logging</a>

@@ -358,6 +358,12 @@
           });
         }
 
+        const modelUri =
+          window.location.hostname == "localhost"
+            ? "/Cesium_Air.gltf"
+            : // Accomodate Github pages
+              "/ardupilot_vg/Cesium_Air.gltf";
+
         let rotationScratch: Matrix3 = new Matrix3();
         const airplaneEntity = viewer.entities.add({
           availability: new TimeIntervalCollection([
@@ -366,7 +372,7 @@
           position: sampledPositionProperty,
           model: {
             // Github pages prefix
-            uri: "/ardupilot_vg/Cesium_Air.gltf",
+            uri: modelUri,
             minimumPixelSize: 64,
             maximumScale: 100,
             scale: 1,

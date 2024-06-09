@@ -1,6 +1,11 @@
 <script lang="ts">
-  // Accomodate github pages
-  window.CESIUM_BASE_URL = "/ardupilot_vg";
+  if (window.location.hostname == "localhost") {
+    window.CESIUM_BASE_URL = "/";
+  } else {
+    // Accomodate github pages
+    window.CESIUM_BASE_URL = "/ardupilot_vg";
+  }
+
   import {
     Cartesian3,
     createOsmBuildingsAsync,
