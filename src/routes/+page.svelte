@@ -62,6 +62,6 @@
 <div style="display: flex; justify-content: center">
   <p>
     <a href="ardupilot_datalogger">Flight path logging</a>
-    · <a href="/about">About</a> · James Vella © 2024
+    · <a href="about">About</a> · James Vella © 2024
   </p>
 </div>
