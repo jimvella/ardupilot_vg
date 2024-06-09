@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" href="./favicon.png" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		
+		<link href="./_app/immutable/assets/0.CMEj8eGe.css" rel="stylesheet">
+		<link rel="modulepreload" href="./_app/immutable/entry/start.DAsFyYni.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/entry.5nq5DyfL.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/scheduler.CwdQ81Uq.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/index.CCFq7Fbk.js">
+		<link rel="modulepreload" href="./_app/immutable/entry/app.BEIo6naK.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/preload-helper.D6kgxu3v.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/index.wZA6n5_d.js">
+		<link rel="modulepreload" href="./_app/immutable/nodes/0.B58vAqrR.js">
+		<link rel="modulepreload" href="./_app/immutable/nodes/4.6-par6SE.js">
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">  <div class="app svelte-17zjd7l"><header class="svelte-17efkyt"></header> <main class="svelte-17zjd7l"><h1 data-svelte-h="svelte-u9hmnc">Drone autopilot flight logging</h1> <h2 style="margin-top: -1em;" data-svelte-h="svelte-qzzjml">For aerobatic and loss of control training flights</h2> <p data-svelte-h="svelte-1i5qsut">A technical ecosystem and collective experience in the form of open source
+  software and commodity hardware has developed around drones that we can tap
+  into for relatively low cost yet precise aircraft flight path logging. <a href="https://ardupilot.org/">ArduPilot</a>
+  is an example of such software which at its heart has an &quot;<a href="https://ardupilot.org/copter/docs/common-apm-navigation-extended-kalman-filter-overview.html">advanced sensor fusion algorithm</a>
+  that can extend the GPS based positioning with inertial navigation to deliver a
+  smooth and accurate flight path and attitude log with 15-25 points per second.
+  This compares to 1-2 per second (with no attitude information) of a typical GPS
+  only system.&quot;
+  <a href="https://discuss.ardupilot.org/t/flight-coach-using-ardupilot-bin-files-as-an-interesting-way-of-viewing-aerobatic-flights/74134">[1]</a>. <a href="https://docs.cubepilot.org/user-guides">CubePilot</a> is an example
+  of commodity hardware that can host software such as ArduPilot.</p> <h2 data-svelte-h="svelte-1thwg1m">ArduPilot Plane BlackBox Logger</h2> <p data-svelte-h="svelte-1lq45kt">ArduPilot has <a href="https://ardupilot.org/plane/docs/common-blackboxlogger.html">specific firmare*</a>
+  designed for the BlackBox logger usecase. Note this is a build time option, but
+  there is a
+  <a href="https://ardupilot.org/plane/docs/common-blackboxlogger.html">community build server</a> available for building.</p> <p data-svelte-h="svelte-14wr4ku">* In ArduPilot nomenclature &#39;firmware&#39; means software that runs on the drone -
+  as opposed to software that runs on the ground station.</p> <h2 data-svelte-h="svelte-ymxlht">CubePilot Hardware</h2>
+A suggested configuration is the Cube Orange+, Mini Carrier Board, and Here4 GPS
+(roughly $1000 AUD).
+
+<h2 data-svelte-h="svelte-8i2ghh">Aircraft Mounting</h2>
+TODO
+
+<h2 data-svelte-h="svelte-1u1zftf">Analysing Logs</h2> <p data-svelte-h="svelte-1csnpts">The <a href="https://ardupilot.org/plane/docs/common-logs.html">logs</a>
+  recorded by the autopilot are called Dataflash logs and can be identified by the
+  &#39;.bin&#39; file extention. The easiest way to review ArduPilot logs is the web based
+  <a href="https://plot.ardupilot.org/#/">UAV Log Viewer</a> application.
+  Details of what is logged can be found in the
+  <a href="https://ardupilot.org/plane/docs/logmessages.html">ArduPilot documentaion</a>.</p></main> <footer class="svelte-17zjd7l"></footer> </div> 
+			
+			<script>
+				{
+					__sveltekit_1trvng3 = {
+						base: new URL(".", location).pathname.slice(0, -1)
+					};
+
+					const element = document.currentScript.parentElement;
+
+					const data = [null,null];
+
+					Promise.all([
+						import("./_app/immutable/entry/start.DAsFyYni.js"),
+						import("./_app/immutable/entry/app.BEIo6naK.js")
+					]).then(([kit, app]) => {
+						kit.start(app, element, {
+							node_ids: [0, 4],
+							data,
+							form: null,
+							error: null
+						});
+					});
+				}
+			</script>
+		</div>
+	</body>
+</html>
