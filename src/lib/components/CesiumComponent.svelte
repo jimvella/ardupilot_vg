@@ -15,6 +15,8 @@
     TrustedServers,
     ScreenSpaceEventHandler,
     ScreenSpaceEventType,
+    Color,
+    NearFarScalar,
   } from "cesium";
   import "cesium/Build/Cesium/Widgets/widgets.css";
   import { onMount } from "svelte";
@@ -44,11 +46,29 @@
       //selectionIndicator: false,
       //creditContainer: document.createElement("none"),
       terrain: Terrain.fromWorldTerrain(),
-      //shadows: true,
+      shadows: true,
       //terrainShadows: ShadowMode.ENABLED,
-      //msaaSamples: 8,
+      msaaSamples: 8,
     });
+
     viewer.shadowMap.maximumDistance = 10000;
+
+    // viewer.scene.postProcessStages.ambientOcclusion.enabled = false;
+    // viewer.scene.postProcessStages.bloom.enabled = false;
+    // viewer.scene.globe.enableLighting = true;
+    // viewer.scene.globe.depthTestAgainstTerrain = true;
+    // viewer.shadowMap.maxmimumDistance = 10000.0;
+    // viewer.shadowMap.softShadows = true;
+    // viewer.shadowMap.size = 4096;
+    // viewer.scene.globe.translucency.frontFaceAlphaByDistance =
+    //   new NearFarScalar(50.0, 0.4, 150.0, 1.0);
+    // viewer.scene.globe.translucency.enabled = true;
+    // viewer.scene.screenSpaceCameraController.enableCollisionDetection = false;
+    // viewer.scene.globe.undergroundColor = Color.MIDNIGHTBLUE;
+    // viewer.scene.globe.undergroundColorAlphaByDistance.near = 2;
+    // viewer.scene.globe.undergroundColorAlphaByDistance.far = 10;
+    // viewer.scene.globe.undergroundColorAlphaByDistance.nearValue = 0.2;
+    // viewer.scene.globe.undergroundColorAlphaByDistance.farValue = 1.0;
 
     // hide controls
     //viewer.animation.container.style.visibility = "hidden";

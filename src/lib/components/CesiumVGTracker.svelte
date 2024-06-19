@@ -23,7 +23,11 @@
     defined,
     Math as CesiumMath,
     type Viewer,
-    HeadingPitchRange,
+    PolylineColorAppearance,
+    Primitive,
+    GeometryInstance,
+    PolylineGeometry,
+    ColorGeometryInstanceAttribute,
   } from "cesium";
   import type { Writable } from "svelte/store";
   import { onMount } from "svelte";
@@ -47,6 +51,9 @@
       interpolationAlgorithm: LagrangePolynomialApproximation,
       interpolationDegree: 5,
     });
+    const sampledFixedFrameAccelerationProperty = new SampledProperty(
+      Cartesian3
+    );
 
     const sampledOrientationProperty = new SampledProperty(Quaternion);
     sampledOrientationProperty.setInterpolationOptions({
@@ -77,8 +84,12 @@
     let zmin = 0;
     let zmax = 0;
 
+    // for trajectory
+    const positions = [];
+
     yieldingLoop(
       length,
+      //30000,
       100, // chunk
       (i) => {
         const p = {};
@@ -147,6 +158,11 @@
         const accY = accYFilter.apply(data.messages["IMU[2]"].AccY[i * 2]);
         const accZ = accZFilter.apply(data.messages["IMU[2]"].AccZ[i * 2]);
 
+        sampledFixedFrameAccelerationProperty.addSample(
+          p.time,
+          Cartesian3.fromElements(accX, accY, accZ)
+        );
+
         const aVector = rotate(
           Cartesian3.fromElements(
             // Not sure about slip and forward / aft acceleration
@@ -167,14 +183,16 @@
         });
         sampleEntities.push(pointEntity);
 
-        // Point the camera at the points being loaded in
-        if (i == 1) {
-          viewer.flyTo(pointEntity, {
-            offset: new HeadingPitchRange(Math.PI, 0, 1000),
-          });
-        }
+        // // Point the camera at the points being loaded in
+        // if (i == 1) {
+        //   viewer.flyTo(pointEntity, {
+        //     offset: new HeadingPitchRange(Math.PI, 0, 1000),
+        //   });
+        // }
 
         sampledPositionProperty.addSample(p.time, p.position);
+
+        positions.push(p.position);
       },
       () => {
         if (showVectors == false) {
@@ -209,22 +227,51 @@
             //silhouetteSize: 1,
           },
           orientation: sampledOrientationProperty,
-          path: {
-            //resolution: 1,
-            // material: new PolylineGlowMaterialProperty({
-            //   glowPower: 0.1,
-            //   color: Color.YELLOW,
-            // }),
-            material: Color.MAGENTA,
-            width: 2,
-            show: showPath,
-          },
+          // Seems to hog performance
+          // path: {
+          //   //resolution: 1,
+          //   // material: new PolylineGlowMaterialProperty({
+          //   //   glowPower: 0.1,
+          //   //   color: Color.YELLOW,
+          //   // }),
+          //   material: Color.MAGENTA,
+          //   width: 2,
+          //   show: showPath,
+          // },
         });
         airplaneEntity.position.setInterpolationOptions({
           interpolationAlgorithm: LagrangePolynomialApproximation,
           interpolationDegree: 5,
         });
         entity = airplaneEntity;
+
+        {
+          // plot trajectory
+
+          console.log("positions", positions);
+          const geometryInstances = [
+            new GeometryInstance({
+              geometry: new PolylineGeometry({
+                positions: positions,
+                width: 3.0,
+              }),
+              attributes: {
+                color: ColorGeometryInstanceAttribute.fromColor(Color.MAGENTA),
+              },
+            }),
+          ];
+          const trajectoryPrimitive = new Primitive({
+            geometryInstances: geometryInstances,
+            appearance: new PolylineColorAppearance(),
+          });
+          console.log("created");
+
+          viewer.scene.primitives.add(trajectoryPrimitive);
+          viewer.scene.primitives.raiseToTop(trajectoryPrimitive);
+          console.log("rendering");
+          viewer.scene.requestRender();
+          console.log("rendered");
+        }
 
         const velocityEntity = viewer.entities.add({
           position: sampledPositionProperty,
@@ -322,6 +369,12 @@
             g = Cartesian3.magnitude(sg);
           }
 
+          const ffa: Cartesian3 =
+            sampledFixedFrameAccelerationProperty.getValue(clock.currentTime);
+          ax = ffa.x;
+          ay = ffa.y;
+          az = ffa.z;
+
           const knotsPerMetersPerSecond = 1.944;
           const position = airplaneEntity.position.getValue(clock.currentTime);
           if (position) {
@@ -363,7 +416,7 @@
           }
         });
 
-        updateVgVectors();
+        //updateVgVectors();
       }
     );
   };
@@ -497,6 +550,9 @@
   let samples = 0;
   let velocity = 0;
   let g = 0;
+  let ax = 0;
+  let ay = 0;
+  let az = 0;
 
   let windDir = "360";
   let windSpeed = "0";
@@ -586,6 +642,12 @@ Samples: {samples}
 Velocity (m/s): {velocity}
 <br />
 g (m/s^2): {g}
+<br />
+ax: {ax}
+<br />
+ay: {ay}
+<br />
+az: {az}
 <br />
 Wind
 <input type="text" id="windDir" name="windDir" size="3" bind:value={windDir} />T
