@@ -29,8 +29,8 @@
     PolylineGeometry,
     ColorGeometryInstanceAttribute,
   } from "cesium";
-  import type { Writable } from "svelte/store";
-  import { onMount } from "svelte";
+  import { writable, type Writable } from "svelte/store";
+  import { onMount, tick } from "svelte";
   import { OrderedExponentialFilter } from "./filters/ExponentialFilter";
 
   let ardupilotBinParserworker: Worker | undefined = undefined;
@@ -40,10 +40,75 @@
   let pitchOffset = 0;
   let altitudeOffset = 0;
 
+  let altitudeOffsetStore = writable(0);
+  $: {
+    altitudeOffsetStore.set(altitudeOffset);
+  }
+
+  const projectOntoPlane = (v: Cartesian3, plane: [Cartesian3, Cartesian3]) => {
+    //projmx - m(mtm)-1mt x
+    //https://www.youtube.com/watch?v=OScgkL21Ffc
+    const mtm = [
+      plane[0].x * plane[0].x +
+        plane[0].y * plane[0].y +
+        plane[0].z * plane[0].z,
+      plane[0].x * plane[1].x +
+        plane[0].y * plane[1].y +
+        plane[0].z * plane[1].z,
+      plane[0].x * plane[1].x +
+        plane[0].y * plane[1].y +
+        plane[0].z * plane[1].z,
+      plane[1].x * plane[1].x +
+        plane[1].y * plane[1].y +
+        plane[1].z * plane[1].z,
+    ];
+
+    const det = mtm[0] * mtm[3] - mtm[1] * mtm[2];
+    const invmtm = [mtm[3] / det, -mtm[2] / det, -mtm[1] / det, mtm[0] / det];
+    const minvmtm = [
+      plane[0].x * invmtm[0] + plane[1].x * invmtm[2],
+      plane[0].x * invmtm[1] + plane[1].x * invmtm[3],
+      plane[0].y * invmtm[0] + plane[1].y * invmtm[2],
+      plane[0].y * invmtm[1] + plane[1].y * invmtm[3],
+      plane[0].z * invmtm[0] + plane[1].z * invmtm[2],
+      plane[0].z * invmtm[1] + plane[1].z * invmtm[3],
+    ];
+
+    const mtx = [
+      plane[0].x * v.x + plane[0].y * v.y + plane[0].z * v.z,
+      plane[1].x * v.x + plane[1].y * v.y + plane[1].z * v.z,
+    ];
+
+    const minvmtm_mtx = Cartesian3.fromElements(
+      minvmtm[0] * mtx[0] + minvmtm[1] * mtx[1],
+      minvmtm[2] * mtx[0] + minvmtm[3] * mtx[1],
+      minvmtm[4] * mtx[0] + minvmtm[5] * mtx[1]
+    );
+
+    return minvmtm_mtx;
+  };
+
   const loadArdupilotData = (data, length, dataAtIndex) => {
     console.log("loading ardupilot data");
 
     const sampledPositionProperty = new SampledPositionProperty();
+    sampledPositionProperty.setInterpolationOptions({
+      interpolationAlgorithm: LagrangePolynomialApproximation,
+      interpolationDegree: 5,
+    });
+    const sampledRawPositionProperty = new SampledPositionProperty();
+    sampledRawPositionProperty.setInterpolationOptions({
+      interpolationAlgorithm: LagrangePolynomialApproximation,
+      interpolationDegree: 5,
+    });
+    const sampledPositionPropertyWithAltOffset = new CallbackProperty((t) => {
+      const i = sampledRawPositionProperty.getValue(t);
+      const lng = i.x / 10000000;
+      const lat = i.y / 10000000;
+      const alt = i.z + altitudeOffset;
+      return Cartesian3.fromDegrees(lng, lat, alt);
+    }, false);
+
     const sampledVelocityProperty = new SampledProperty(Cartesian3);
     sampledVelocityProperty.setInterpolationOptions({
       interpolationAlgorithm: LagrangePolynomialApproximation,
@@ -87,6 +152,10 @@
       Cartesian3.ZERO,
       HeadingPitchRoll.fromDegrees(0, 90, 0)
     );
+    const rotateHeadingAndPitch = Transforms.headingPitchRollQuaternion(
+      Cartesian3.ZERO,
+      HeadingPitchRoll.fromDegrees(0, 0, 270)
+    );
 
     const eastNorthUpToFixedFrameAtPosition: Matrix4 = new Matrix4();
 
@@ -96,9 +165,6 @@
 
     let zmin = 0;
     let zmax = 0;
-
-    // for trajectory
-    const positions = [];
 
     yieldingLoop(
       length,
@@ -116,6 +182,15 @@
           data.messages["POS"].Lng[i] / 10000000,
           data.messages["POS"].Lat[i] / 10000000,
           data.messages["POS"].Alt[i]
+        );
+
+        sampledRawPositionProperty.addSample(
+          p.time,
+          Cartesian3.fromElements(
+            data.messages["POS"].Lng[i],
+            data.messages["POS"].Lat[i],
+            data.messages["POS"].Alt[i]
+          )
         );
 
         samples = samples + 1;
@@ -167,6 +242,7 @@
           HeadingPitchRoll.fromDegrees(yaw - 90, pitch, roll)
         );
         sampledOrientationProperty.addSample(p.time, orientation);
+
         sampledRawOrientationProperty.addSample(
           p.time,
           Cartesian3.fromElements(yaw, pitch, roll)
@@ -185,13 +261,21 @@
         );
 
         const aVector = rotate(
+          // Cartesian3.fromElements(
+          //   // Not sure about slip and forward / aft acceleration
+          //   accY,
+          //   -accZ,
+          //   -accX
+          // ),
           Cartesian3.fromElements(
             // Not sure about slip and forward / aft acceleration
             accX,
-            -accZ,
-            accY
+            -accY,
+            -accZ
           ),
-          [orientation]
+          // Pitch offset??
+          [orientation],
+          new Cartesian3()
         );
         sampledAccelerationProperty.addSample(p.time, aVector);
 
@@ -212,8 +296,7 @@
         // }
 
         sampledPositionProperty.addSample(p.time, p.position);
-
-        positions.push(p.position);
+        //positions.push(p.position);
       },
       () => {
         if (showVectors == false) {
@@ -251,7 +334,7 @@
           availability: new TimeIntervalCollection([
             new TimeInterval({ start: start, stop: stop }),
           ]),
-          position: sampledPositionProperty,
+          position: sampledPositionPropertyWithAltOffset,
           model: {
             // Github pages prefix
             uri: modelUri,
@@ -280,40 +363,58 @@
           //   show: showPath,
           // },
         });
-        airplaneEntity.position.setInterpolationOptions({
-          interpolationAlgorithm: LagrangePolynomialApproximation,
-          interpolationDegree: 5,
-        });
         entity = airplaneEntity;
 
         {
-          // plot trajectory
-          const geometryInstances = [
-            new GeometryInstance({
-              geometry: new PolylineGeometry({
-                positions: positions,
-                width: 3.0,
-              }),
-              attributes: {
-                color: ColorGeometryInstanceAttribute.fromColor(Color.MAGENTA),
-              },
-            }),
-          ];
-          const trajectoryPrimitive = new Primitive({
-            geometryInstances: geometryInstances,
-            appearance: new PolylineColorAppearance(),
-          });
+          let trajectoryPrimitive: Primitive | undefined = undefined;
+          altitudeOffsetStore.subscribe((i) => {
+            // plot trajectory
 
-          viewer.scene.primitives.add(trajectoryPrimitive);
-          viewer.scene.primitives.raiseToTop(trajectoryPrimitive);
-          viewer.scene.requestRender();
+            // for trajectory
+            const positions = [];
+            const length = data.messages["POS"].time_boot_ms.length;
+            for (let j = 0; j < length; j++) {
+              const point = Cartesian3.fromDegrees(
+                data.messages["POS"].Lng[j] / 10000000,
+                data.messages["POS"].Lat[j] / 10000000,
+                data.messages["POS"].Alt[j] + i
+              );
+              positions.push(point);
+            }
+
+            const geometryInstances = [
+              new GeometryInstance({
+                geometry: new PolylineGeometry({
+                  positions: positions,
+                  width: 3.0,
+                }),
+                attributes: {
+                  color: ColorGeometryInstanceAttribute.fromColor(
+                    Color.MAGENTA
+                  ),
+                },
+              }),
+            ];
+
+            if (trajectoryPrimitive != undefined) {
+              viewer.scene.primitives.remove(trajectoryPrimitive);
+            }
+            trajectoryPrimitive = new Primitive({
+              geometryInstances: geometryInstances,
+              appearance: new PolylineColorAppearance(),
+            });
+
+            viewer.scene.primitives.add(trajectoryPrimitive);
+            viewer.scene.primitives.raiseToTop(trajectoryPrimitive);
+            viewer.scene.requestRender();
+          });
         }
 
         const velocityEntity = viewer.entities.add({
-          position: sampledPositionProperty,
+          position: sampledPositionPropertyWithAltOffset,
           polyline: new PolylineGraphics({
             positions: new CallbackProperty((t) => {
-              const p = sampledPositionProperty.getValue(t);
+              const p = sampledPositionPropertyWithAltOffset.getValue(t);
               const v = Cartesian3.multiplyByScalar(
                 sampledVelocityProperty.getValue(t),
                 scale,
@@ -332,10 +433,10 @@
         interpolatedVectorEntities.push(velocityEntity);
 
         const accelerationEntity = viewer.entities.add({
-          position: sampledPositionProperty,
+          position: sampledPositionPropertyWithAltOffset,
           polyline: new PolylineGraphics({
             positions: new CallbackProperty((t) => {
-              const p = sampledPositionProperty.getValue(t);
+              const p = sampledPositionPropertyWithAltOffset.getValue(t);
               const v = Cartesian3.multiplyByScalar(
                 sampledAccelerationProperty.getValue(t),
                 scale,
@@ -354,12 +455,12 @@
         interpolatedVectorEntities.push(accelerationEntity);
 
         const orientationEntity = viewer.entities.add({
-          position: sampledPositionProperty,
+          position: sampledPositionPropertyWithAltOffset,
           polyline: new PolylineGraphics({
             positions: new CallbackProperty((t) => {
-              const p = sampledPositionProperty.getValue(t);
+              const p = sampledPositionPropertyWithAltOffset.getValue(t);
               const v = Cartesian3.multiplyByScalar(
-                rotate(Cartesian3.fromElements(-20, 0, 0), [
+                rotate(Cartesian3.fromElements(0, -20, 0), [
                   pitchOffsetOrientation.getValue(t),
                   velocityRotationFromDatum,
                 ]),
@@ -378,12 +479,80 @@
         });
         interpolatedVectorEntities.push(orientationEntity);
 
-        // TODO - relative wind (ala aoa)
-        const windEntity = viewer.entities.add({
-          position: sampledPositionProperty,
+        const normalEntity = viewer.entities.add({
+          position: sampledPositionPropertyWithAltOffset,
           polyline: new PolylineGraphics({
             positions: new CallbackProperty((t) => {
-              const p = sampledPositionProperty.getValue(t);
+              const p = sampledPositionPropertyWithAltOffset.getValue(t);
+
+              const transform = new Matrix4();
+              Transforms.eastNorthUpToFixedFrame(p, Ellipsoid.WGS84, transform);
+              const v = Matrix4.multiplyByPointAsVector(
+                transform,
+                Cartesian3.fromElements(0, 0, 300),
+                new Cartesian3()
+              );
+
+              if (p && v) {
+                return [p, Cartesian3.add(p, v, new Cartesian3())];
+              } else {
+                return undefined;
+              }
+            }, false),
+            width: 3,
+            material: Color.BLUEVIOLET,
+          }),
+        });
+        interpolatedVectorEntities.push(normalEntity);
+
+        // const orientationEntity2 = viewer.entities.add({
+        //   position: sampledPositionPropertyWithAltOffset,
+        //   polyline: new PolylineGraphics({
+        //     positions: new CallbackProperty((t) => {
+        //       const p = sampledPositionPropertyWithAltOffset.getValue(t);
+        //       const v = Cartesian3.multiplyByScalar(
+        //         rotate(Cartesian3.fromElements(-20, 0, 0), [
+        //           pitchOffsetOrientation.getValue(t),
+        //           rotateHeadingAndPitch,
+        //         ]),
+        //         scale,
+        //         new Cartesian3()
+        //       );
+        //       const v1 = Cartesian3.multiplyByScalar(
+        //         rotate(Cartesian3.fromElements(-20, 0, 0), [
+        //           pitchOffsetOrientation.getValue(t),
+        //           velocityRotationFromDatum,
+        //         ]),
+        //         scale,
+        //         new Cartesian3()
+        //       );
+
+        //       const vel = Cartesian3.multiplyByScalar(
+        //         sampledVelocityProperty.getValue(t),
+        //         scale,
+        //         new Cartesian3()
+        //       );
+
+        //       const vp = projectOntoPlane(vel, [v, v1]);
+
+        //       if (p && v) {
+        //         return [p, Cartesian3.add(p, vp, new Cartesian3())];
+        //       } else {
+        //         return undefined;
+        //       }
+        //     }, false),
+        //     width: 3,
+        //     material: Color.BLUE,
+        //   }),
+        // });
+        // interpolatedVectorEntities.push(orientationEntity2);
+
+        // TODO - relative wind (ala aoa)
+        const windEntity = viewer.entities.add({
+          position: sampledPositionPropertyWithAltOffset,
+          polyline: new PolylineGraphics({
+            positions: new CallbackProperty((t) => {
+              const p = sampledPositionPropertyWithAltOffset.getValue(t);
               const v = Cartesian3.multiplyByScalar(
                 sampledWindProperty.getValue(t),
                 scale,
@@ -414,10 +583,10 @@
         interpolatedVectorEntities.push(windEntity);
 
         const relativeWindEntity = viewer.entities.add({
-          position: sampledPositionProperty,
+          position: sampledPositionPropertyWithAltOffset,
           polyline: new PolylineGraphics({
             positions: new CallbackProperty((t) => {
-              const p = sampledPositionProperty.getValue(t);
+              const p = sampledPositionPropertyWithAltOffset.getValue(t);
               const v = Cartesian3.multiplyByScalar(
                 sampledWindProperty.getValue(t),
                 scale,
@@ -477,6 +646,54 @@
             heading = so.x;
             pitch = so.y;
             roll = so.z;
+          }
+
+          // aoa
+          {
+            // relative wind
+            const relativeWind = Cartesian3.subtract(
+              sv,
+              sampledWindProperty.getValue(clock.currentTime),
+              new Cartesian3()
+            );
+            const planeBasisVectors: [Cartesian3, Cartesian3] = [
+              // londitudinal axis
+              Cartesian3.multiplyByScalar(
+                rotate(Cartesian3.fromElements(-20, 0, 0), [
+                  pitchOffsetOrientation.getValue(clock.currentTime),
+                  velocityRotationFromDatum,
+                ]),
+                scale,
+                new Cartesian3()
+              ),
+              // normal axis
+              Cartesian3.multiplyByScalar(
+                rotate(Cartesian3.fromElements(-20, 0, 0), [
+                  pitchOffsetOrientation.getValue(clock.currentTime),
+                  rotateHeadingAndPitch,
+                ]),
+                scale,
+                new Cartesian3()
+              ),
+            ];
+            const projectedRelativeWind = projectOntoPlane(
+              relativeWind,
+              planeBasisVectors
+            );
+
+            console.log("projectedRelativeWind", projectedRelativeWind);
+
+            try {
+              aoa =
+                (Cartesian3.angleBetween(
+                  projectedRelativeWind,
+                  planeBasisVectors[0]
+                ) *
+                  180) /
+                Math.PI;
+            } catch (error) {
+              console.log("error calculating aoa", error);
+            }
           }
 
           const ffa: Cartesian3 =
@@ -619,7 +836,7 @@
 
     const rotationInverse = Quaternion.inverse(rotation, new Quaternion());
 
-    let p = new Quaternion(0, vector.x, vector.y, vector.z);
+    let p = new Quaternion(vector.x, vector.y, vector.z, 0);
     // passive
     p = Quaternion.multiply(rotation, p, p);
     p = Quaternion.multiply(p, rotationInverse, p);
@@ -670,6 +887,7 @@
   let windDir = 360;
   let windSpeed = 0;
   let tas = 0;
+  let aoa = 0;
 
   let viewer: Viewer;
 
@@ -758,32 +976,44 @@ ArduPilot bin
 
 Samples: {samples}
 <br />
-Velocity (m/s): {velocity}
 <br />
-g (m/s^2): {g}
+g (load factor): {(g / 9.8).toFixed(1)}
 <br />
-ax: {ax}
+ax (m/s^2): {ax.toFixed(1)}
 <br />
-ay: {ay}
+ay (m/s^2): {ay.toFixed(1)}
 <br />
-az: {az}
-<br />
-Wind {windDir}
-{windSpeed}KT
-<br />
-TAS {Math.round(tas)}KT
+az (m/s^2): {az.toFixed(1)}
 <br />
 <br />
-Heading {heading}
-Pitch {pitch + pitchOffset}
-Roll {roll}
+GS {velocity.toFixed(0)}KT
+<br />
+Wind {windDir.toFixed(0)}
+{windSpeed.toFixed(0)}KT
+<br />
+TAS {tas.toFixed(0)}KT
 <br />
 <br />
-Pitch offset {pitchOffset}
-<input type="range" min="-30" max="30" bind:value={pitchOffset} />
+Heading {heading.toFixed(0)}
+Pitch {(pitch + pitchOffset).toFixed(1)}
+Roll {roll.toFixed(0)}
 <br />
-Altitude offset {altitudeOffset}
-<input type="range" min="-1000" max="1000" bind:value={altitudeOffset} />
+Angle of attack {aoa.toFixed(1)}
+<br />
+<br />
+Pitch offset
+<input type="range" min="-30" max="30" step="0.1" bind:value={pitchOffset} />
+{pitchOffset}
+<br />
+Altitude offset
+<input
+  type="range"
+  min="-200"
+  max="200"
+  step="0.1"
+  bind:value={altitudeOffset}
+/>
+{altitudeOffset}
 <br />
 <br />
 <label for="showSamples">Show samples</label>
