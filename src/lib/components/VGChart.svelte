@@ -42,7 +42,6 @@
     _currentTime: JulianDate
   ) => {
     let minutes = Number(showVgSamplesWithinMinutes);
-    console.log("aircraftHistoricalDataset");
     const start = JulianDate.addMinutes(
       _currentTime,
       -minutes,
@@ -397,10 +396,8 @@
       chart.data.datasets[6] = vsPositiveDataset(vs, gLimitPositive, vne, vno);
       chart.data.datasets[7] = vsNegativeDataset(vs, gLimitNegative, vne, vno);
 
-      console.log("updating");
       chart.options.scales = scales(vne, gLimitPositive, gLimitNegative);
       chart.update();
-      console.log("updated");
     }
   };
 

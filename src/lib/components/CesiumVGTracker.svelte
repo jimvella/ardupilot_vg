@@ -10,7 +10,6 @@
     HeadingPitchRoll,
     JulianDate,
     LagrangePolynomialApproximation,
-    Matrix3,
     Matrix4,
     PolylineGraphics,
     Quaternion,
@@ -262,19 +261,7 @@
         );
 
         const aVector = rotate(
-          // Cartesian3.fromElements(
-          //   // Not sure about slip and forward / aft acceleration
-          //   accY,
-          //   -accZ,
-          //   -accX
-          // ),
-          Cartesian3.fromElements(
-            // Not sure about slip and forward / aft acceleration
-            accX,
-            -accY,
-            -accZ
-          ),
-          // Pitch offset??
+          Cartesian3.fromElements(accX, -accY, -accZ),
           [orientation],
           new Cartesian3()
         );
@@ -289,23 +276,10 @@
         });
         sampleEntities.push(pointEntity);
 
-        // // Point the camera at the points being loaded in
-        // if (i == 1) {
-        //   viewer.flyTo(pointEntity, {
-        //     offset: new HeadingPitchRange(Math.PI, 0, 1000),
-        //   });
-        // }
-
         sampledPositionProperty.addSample(p.time, p.position);
         //positions.push(p.position);
       },
       () => {
-        if (showVectors == false) {
-          vectorEntities.forEach((i) => {
-            i.show = showVectors;
-          });
-        }
-
         const pitchOffsetOrientation = new CallbackProperty((t) => {
           const p = sampledPositionProperty.getValue(t);
           const i = sampledRawOrientationProperty.getValue(t);
@@ -314,7 +288,6 @@
           const _pitch = i.y;
           const _roll = i.z;
 
-          console.log("Heading", _heading - 90);
           const orientation = Transforms.headingPitchRollQuaternion(
             p,
             HeadingPitchRoll.fromDegrees(
@@ -373,7 +346,6 @@
           altitudeOffsetStore.subscribe((i) => {
             // plot trajectory
 
-            // for trajectory
             const positions = [];
             const length = data.messages["POS"].time_boot_ms.length;
             for (let j = 0; j < length; j++) {
@@ -468,7 +440,6 @@
               const v = Cartesian3.multiplyByScalar(
                 rotate(Cartesian3.fromElements(0, -20, 0), [
                   pitchOffsetOrientation.getValue(t),
-                  //sampledOrientationProperty.getValue(t),
                   velocityRotationFromDatum,
                 ]),
                 scale,
@@ -486,7 +457,6 @@
         });
         interpolatedVectorEntities.push(orientationEntity);
 
-        // TODO - relative wind (ala aoa)
         windEntity = viewer.entities.add({
           position: sampledPositionPropertyWithAltOffset,
           show: false,
@@ -632,7 +602,7 @@
                   180) /
                 Math.PI;
             } catch (error) {
-              console.log("error calculating aoa", error);
+              //console.log("error calculating aoa", error);
             }
           }
 
@@ -695,19 +665,6 @@
               wind
             );
 
-            // if (sv) {
-            //   const relativeAirflow = Cartesian3.add(
-            //     sv,
-            //     wind,
-            //     new Cartesian3()
-            //   );
-
-            //   tas =
-            //     Cartesian3.magnitude(relativeAirflow) * knotsPerMetersPerSecond;
-            // } else {
-            //   tas = undefined;
-            // }
-
             // tas
             {
               const rw = Cartesian3.subtract(
@@ -725,8 +682,6 @@
             onUpdate(tas, g / 9.8, clock.currentTime);
           }
         });
-
-        //updateVgVectors();
       }
     );
   };
@@ -854,8 +809,6 @@
 
   let showSamples = false;
   let showVectors = false;
-  let showInterpolatedVectors = true;
-  let showPath = true;
 
   let samples = 0;
   let totalSamples = 0;
@@ -889,55 +842,9 @@
 
   let viewer: Viewer;
 
-  const updateVgVectors = () => {
-    console.log("Updating vg samples for wind");
-    const result = [];
-
-    console.log(vgVectorStore);
-
-    const knotsPerMetersPerSecond = 1.944;
-    for (let i = 4; i < points.length - 4; i++) {
-      try {
-        const position = points[i].position;
-        let wind = Cartesian3.multiplyByScalar(
-          Cartesian3.UNIT_X,
-          Number(windSpeed) / knotsPerMetersPerSecond,
-          new Cartesian3()
-        );
-        wind = rotate(
-          wind,
-          [
-            Transforms.headingPitchRollQuaternion(
-              position,
-              HeadingPitchRoll.fromDegrees(Number(windDir), 0, 0)
-            ),
-          ],
-          wind
-        );
-        const relativeAirflow = Cartesian3.add(
-          velocities[i].vector,
-          wind,
-          new Cartesian3()
-        );
-        const _tas =
-          Cartesian3.magnitude(relativeAirflow) * knotsPerMetersPerSecond;
-        result.push({
-          tas: _tas,
-          g: Cartesian3.magnitude(accelerations[i].vector) / 9.8,
-          t: points[i].time,
-        });
-      } catch (error) {
-        console.log("i", i);
-        throw error;
-      }
-    }
-    vgVectorStore.set(result);
-  };
-
   $: {
     windDir;
     windSpeed;
-    updateVgVectors();
   }
 
   $: {
