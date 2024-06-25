@@ -1,4 +1,4 @@
-import{s as F,n as L}from"../chunks/scheduler.CwdQ81Uq.js";import{S as I,i as N,e as o,s as x,t as V,c as n,g as l,a as v,b as $,d as E,f as a,h as i}from"../chunks/index.wZA6n5_d.js";function J(j){let s,M="Drone autopilot flight logging",C,r,k="For aerobatic and loss of control training flights",b,h,D=`A technical ecosystem and collective experience in the form of open source
+import{s as F,n as L}from"../chunks/scheduler.CwdQ81Uq.js";import{S as I,i as N,e as o,s as x,t as V,c as n,g as l,a as v,b as $,d as E,f as a,h as i}from"../chunks/index.1IzXDl8J.js";function J(j){let s,M="Drone autopilot flight logging",C,r,k="For aerobatic and loss of control training flights",b,h,D=`A technical ecosystem and collective experience in the form of open source
   software and commodity hardware has developed around drones that we can tap
   into for relatively low cost yet precise aircraft flight path logging. <a href="https://ardupilot.org/">ArduPilot</a>
   is an example of such software which at its heart has an &quot;<a href="https://ardupilot.org/copter/docs/common-apm-navigation-extended-kalman-filter-overview.html">advanced sensor fusion algorithm</a>
