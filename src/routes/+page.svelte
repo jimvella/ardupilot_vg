@@ -39,8 +39,9 @@
       style={columns ? "width: 50%;  float: left;" : "width: " + width + "%"}
     >
       <VgChart {tas} {g} {t} vgSamples={vgVectorStore} />
-      VG Chart width (%)
+
       {#if !columns}
+        VG Chart width (%)
         <input type="range" min="1" max="100" bind:value={width} />
       {/if}
     </div>

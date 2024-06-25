@@ -10,7 +10,7 @@
       <slot name="head"></slot>
     </div>
 
-    <button on:click={handleClick}> +/- </button>
+    <button on:click={handleClick} style="margin-right: 1em;"> +/- </button>
   </div>
 
   {#if open}

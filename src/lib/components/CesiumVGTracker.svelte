@@ -90,6 +90,7 @@
 
   const loadArdupilotData = (data, length, dataAtIndex) => {
     console.log("loading ardupilot data");
+    totalSamples = length;
 
     const sampledPositionProperty = new SampledPositionProperty();
     sampledPositionProperty.setInterpolationOptions({
@@ -129,10 +130,10 @@
       interpolationDegree: 5,
     });
     const sampledRawOrientationProperty = new SampledProperty(Cartesian3);
-    sampledRawOrientationProperty.setInterpolationOptions({
-      interpolationAlgorithm: LagrangePolynomialApproximation,
-      interpolationDegree: 5,
-    });
+    // sampledRawOrientationProperty.setInterpolationOptions({
+    //   interpolationAlgorithm: LagrangePolynomialApproximation,
+    //   interpolationDegree: 5,
+    // });
 
     const sampledWindProperty = new SampledProperty(Cartesian3);
     sampledWindProperty.setInterpolationOptions({
@@ -313,10 +314,12 @@
           const _pitch = i.y;
           const _roll = i.z;
 
+          console.log("Heading", _heading - 90);
           const orientation = Transforms.headingPitchRollQuaternion(
             p,
             HeadingPitchRoll.fromDegrees(
-              _heading - 90,
+              // TODO - some abberations through some heading / pitch angles
+              (_heading + 270) % 360,
               _pitch + pitchOffset,
               _roll
             )
@@ -410,8 +413,9 @@
           });
         }
 
-        const velocityEntity = viewer.entities.add({
+        velocityEntity = viewer.entities.add({
           position: sampledPositionPropertyWithAltOffset,
+          show: false,
           polyline: new PolylineGraphics({
             positions: new CallbackProperty((t) => {
               const p = sampledPositionPropertyWithAltOffset.getValue(t);
@@ -432,8 +436,9 @@
         });
         interpolatedVectorEntities.push(velocityEntity);
 
-        const accelerationEntity = viewer.entities.add({
+        accelerationEntity = viewer.entities.add({
           position: sampledPositionPropertyWithAltOffset,
+          show: false,
           polyline: new PolylineGraphics({
             positions: new CallbackProperty((t) => {
               const p = sampledPositionPropertyWithAltOffset.getValue(t);
@@ -454,14 +459,16 @@
         });
         interpolatedVectorEntities.push(accelerationEntity);
 
-        const orientationEntity = viewer.entities.add({
+        orientationEntity = viewer.entities.add({
           position: sampledPositionPropertyWithAltOffset,
+          show: false,
           polyline: new PolylineGraphics({
             positions: new CallbackProperty((t) => {
               const p = sampledPositionPropertyWithAltOffset.getValue(t);
               const v = Cartesian3.multiplyByScalar(
                 rotate(Cartesian3.fromElements(0, -20, 0), [
                   pitchOffsetOrientation.getValue(t),
+                  //sampledOrientationProperty.getValue(t),
                   velocityRotationFromDatum,
                 ]),
                 scale,
@@ -479,77 +486,10 @@
         });
         interpolatedVectorEntities.push(orientationEntity);
 
-        const normalEntity = viewer.entities.add({
-          position: sampledPositionPropertyWithAltOffset,
-          polyline: new PolylineGraphics({
-            positions: new CallbackProperty((t) => {
-              const p = sampledPositionPropertyWithAltOffset.getValue(t);
-
-              const transform = new Matrix4();
-              Transforms.eastNorthUpToFixedFrame(p, Ellipsoid.WGS84, transform);
-              const v = Matrix4.multiplyByPointAsVector(
-                transform,
-                Cartesian3.fromElements(0, 0, 300),
-                new Cartesian3()
-              );
-
-              if (p && v) {
-                return [p, Cartesian3.add(p, v, new Cartesian3())];
-              } else {
-                return undefined;
-              }
-            }, false),
-            width: 3,
-            material: Color.BLUEVIOLET,
-          }),
-        });
-        interpolatedVectorEntities.push(normalEntity);
-
-        // const orientationEntity2 = viewer.entities.add({
-        //   position: sampledPositionPropertyWithAltOffset,
-        //   polyline: new PolylineGraphics({
-        //     positions: new CallbackProperty((t) => {
-        //       const p = sampledPositionPropertyWithAltOffset.getValue(t);
-        //       const v = Cartesian3.multiplyByScalar(
-        //         rotate(Cartesian3.fromElements(-20, 0, 0), [
-        //           pitchOffsetOrientation.getValue(t),
-        //           rotateHeadingAndPitch,
-        //         ]),
-        //         scale,
-        //         new Cartesian3()
-        //       );
-        //       const v1 = Cartesian3.multiplyByScalar(
-        //         rotate(Cartesian3.fromElements(-20, 0, 0), [
-        //           pitchOffsetOrientation.getValue(t),
-        //           velocityRotationFromDatum,
-        //         ]),
-        //         scale,
-        //         new Cartesian3()
-        //       );
-
-        //       const vel = Cartesian3.multiplyByScalar(
-        //         sampledVelocityProperty.getValue(t),
-        //         scale,
-        //         new Cartesian3()
-        //       );
-
-        //       const vp = projectOntoPlane(vel, [v, v1]);
-
-        //       if (p && v) {
-        //         return [p, Cartesian3.add(p, vp, new Cartesian3())];
-        //       } else {
-        //         return undefined;
-        //       }
-        //     }, false),
-        //     width: 3,
-        //     material: Color.BLUE,
-        //   }),
-        // });
-        // interpolatedVectorEntities.push(orientationEntity2);
-
         // TODO - relative wind (ala aoa)
-        const windEntity = viewer.entities.add({
+        windEntity = viewer.entities.add({
           position: sampledPositionPropertyWithAltOffset,
+          show: false,
           polyline: new PolylineGraphics({
             positions: new CallbackProperty((t) => {
               const p = sampledPositionPropertyWithAltOffset.getValue(t);
@@ -582,8 +522,9 @@
         });
         interpolatedVectorEntities.push(windEntity);
 
-        const relativeWindEntity = viewer.entities.add({
+        relativeWindEntity = viewer.entities.add({
           position: sampledPositionPropertyWithAltOffset,
+          show: false,
           polyline: new PolylineGraphics({
             positions: new CallbackProperty((t) => {
               const p = sampledPositionPropertyWithAltOffset.getValue(t);
@@ -652,6 +593,7 @@
           {
             // relative wind
             const relativeWind = Cartesian3.subtract(
+              // add?
               sv,
               sampledWindProperty.getValue(clock.currentTime),
               new Cartesian3()
@@ -659,7 +601,7 @@
             const planeBasisVectors: [Cartesian3, Cartesian3] = [
               // londitudinal axis
               Cartesian3.multiplyByScalar(
-                rotate(Cartesian3.fromElements(-20, 0, 0), [
+                rotate(Cartesian3.fromElements(0, -20, 0), [
                   pitchOffsetOrientation.getValue(clock.currentTime),
                   velocityRotationFromDatum,
                 ]),
@@ -668,7 +610,7 @@
               ),
               // normal axis
               Cartesian3.multiplyByScalar(
-                rotate(Cartesian3.fromElements(-20, 0, 0), [
+                rotate(Cartesian3.fromElements(0, -20, 0), [
                   pitchOffsetOrientation.getValue(clock.currentTime),
                   rotateHeadingAndPitch,
                 ]),
@@ -681,8 +623,6 @@
               planeBasisVectors
             );
 
-            console.log("projectedRelativeWind", projectedRelativeWind);
-
             try {
               aoa =
                 (Cartesian3.angleBetween(
@@ -694,6 +634,40 @@
             } catch (error) {
               console.log("error calculating aoa", error);
             }
+          }
+
+          // incline / ball
+          {
+            const normalAxisBasis = rotate(Cartesian3.fromElements(0, -20, 0), [
+              pitchOffsetOrientation.getValue(clock.currentTime),
+              rotateHeadingAndPitch,
+            ]);
+
+            const lateralAxisBasis = rotate(
+              Cartesian3.fromElements(-20, 0, 0),
+              [
+                pitchOffsetOrientation.getValue(clock.currentTime),
+                rotateHeadingAndPitch,
+              ]
+            );
+
+            const projectedAcceleration = projectOntoPlane(
+              sampledAccelerationProperty.getValue(clock.currentTime),
+              [normalAxisBasis, lateralAxisBasis]
+            );
+
+            const angleBetween = (a: Cartesian3, b: Cartesian3) => {
+              const dotProduct = a.x * b.x + a.y * b.y + a.z * b.z;
+
+              return Math.acos(
+                dotProduct / (Cartesian3.magnitude(a) * Cartesian3.magnitude(b))
+              );
+            };
+
+            incline =
+              (angleBetween(projectedAcceleration, lateralAxisBasis) * 180) /
+                Math.PI -
+              90;
           }
 
           const ffa: Cartesian3 =
@@ -721,17 +695,27 @@
               wind
             );
 
-            if (sv) {
-              const relativeAirflow = Cartesian3.add(
-                sv,
-                wind,
+            // if (sv) {
+            //   const relativeAirflow = Cartesian3.add(
+            //     sv,
+            //     wind,
+            //     new Cartesian3()
+            //   );
+
+            //   tas =
+            //     Cartesian3.magnitude(relativeAirflow) * knotsPerMetersPerSecond;
+            // } else {
+            //   tas = undefined;
+            // }
+
+            // tas
+            {
+              const rw = Cartesian3.subtract(
+                sampledVelocityProperty.getValue(clock.currentTime),
+                sampledWindProperty.getValue(clock.currentTime),
                 new Cartesian3()
               );
-
-              tas =
-                Cartesian3.magnitude(relativeAirflow) * knotsPerMetersPerSecond;
-            } else {
-              tas = undefined;
+              tas = Cartesian3.magnitude(rw) * knotsPerMetersPerSecond;
             }
           } else {
             tas = undefined;
@@ -874,6 +858,7 @@
   let showPath = true;
 
   let samples = 0;
+  let totalSamples = 0;
   let velocity = 0;
   let g = 0;
   let ax = 0;
@@ -888,6 +873,19 @@
   let windSpeed = 0;
   let tas = 0;
   let aoa = 0;
+  let incline = 0;
+
+  let orientationEntity = undefined;
+  let velocityEntity = undefined;
+  let windEntity = undefined;
+  let relativeWindEntity = undefined;
+  let accelerationEntity = undefined;
+
+  let showOrientation = false;
+  let showVelocity = false;
+  let showWind = false;
+  let showRelativeWind = false;
+  let showAcceleration = false;
 
   let viewer: Viewer;
 
@@ -974,102 +972,124 @@ ArduPilot bin
 />
 <br />
 
-Samples: {samples}
+Samples: {samples} / {totalSamples}
 <br />
 <br />
-g (load factor): {(g / 9.8).toFixed(1)}
+<div style="width: 100%; display: inline-block; margin-bottom: 1em">
+  <div style={"width: 50%;  float: left;"}>
+    g (load factor): {(g / 9.8).toFixed(1)}
+    <br />
+    GS {velocity.toFixed(0)}KT
+    <br />
+    Wind {windDir.toFixed(0)}
+    {windSpeed.toFixed(0)}KT
+    <br />
+    TAS {tas.toFixed(0)}KT
+    <br />
+    <br />
+    ax (m/s^2): {ax.toFixed(1)}
+    <br />
+    ay (m/s^2): {ay.toFixed(1)}
+    <br />
+    az (m/s^2): {az.toFixed(1)}
+    <br />
+  </div>
+  <div style={"margin-left: 50%;"}>
+    Heading {heading.toFixed(0)}
+    Pitch {(pitch + pitchOffset).toFixed(1)}
+    Roll {roll.toFixed(0)}
+    <br />
+    Angle of attack {aoa.toFixed(1)}
+    <br />
+    Incline (ball) {incline.toFixed(1)}
+    <br />
+    <br />
+    <label for="showPath">Show orientation</label>
+    <input
+      type="checkbox"
+      bind:checked={showOrientation}
+      on:change={(e) => {
+        if (orientationEntity) {
+          orientationEntity.show = showOrientation;
+        }
+      }}
+    />
+    <br />
+    <label for="showPath">Show velocity</label>
+    <input
+      type="checkbox"
+      bind:checked={showVelocity}
+      on:change={(e) => {
+        if (velocityEntity) {
+          velocityEntity.show = showVelocity;
+        }
+      }}
+    />
+    <br />
+    <label for="showPath">Show wind</label>
+    <input
+      type="checkbox"
+      bind:checked={showWind}
+      on:change={(e) => {
+        if (windEntity) {
+          windEntity.show = showWind;
+        }
+      }}
+    />
+    <br />
+    <label for="showPath">Show relative wind</label>
+    <input
+      type="checkbox"
+      id="showPath"
+      name="showPath"
+      bind:checked={showRelativeWind}
+      on:change={(e) => {
+        if (relativeWindEntity) {
+          relativeWindEntity.show = showRelativeWind;
+        }
+      }}
+    />
+    <br />
+    <label for="showPath">Show accelaration</label>
+    <input
+      type="checkbox"
+      id="showPath"
+      name="showPath"
+      bind:checked={showAcceleration}
+      on:change={(e) => {
+        if (accelerationEntity) {
+          accelerationEntity.show = showAcceleration;
+        }
+      }}
+    />
+    <br />
+  </div>
+</div>
 <br />
-ax (m/s^2): {ax.toFixed(1)}
-<br />
-ay (m/s^2): {ay.toFixed(1)}
-<br />
-az (m/s^2): {az.toFixed(1)}
-<br />
-<br />
-GS {velocity.toFixed(0)}KT
-<br />
-Wind {windDir.toFixed(0)}
-{windSpeed.toFixed(0)}KT
-<br />
-TAS {tas.toFixed(0)}KT
-<br />
-<br />
-Heading {heading.toFixed(0)}
-Pitch {(pitch + pitchOffset).toFixed(1)}
-Roll {roll.toFixed(0)}
-<br />
-Angle of attack {aoa.toFixed(1)}
-<br />
-<br />
-Pitch offset
-<input type="range" min="-30" max="30" step="0.1" bind:value={pitchOffset} />
-{pitchOffset}
-<br />
-Altitude offset
-<input
-  type="range"
-  min="-200"
-  max="200"
-  step="0.1"
-  bind:value={altitudeOffset}
-/>
-{altitudeOffset}
-<br />
-<br />
-<label for="showSamples">Show samples</label>
-<input
-  type="checkbox"
-  id="showSamples"
-  name="showSamples"
-  bind:checked={showSamples}
-  on:change={(e) => {
-    sampleEntities.forEach((i) => {
-      i.show = showSamples;
-    });
-  }}
-/>
-<br />
-<label for="showVectors">Show vectors</label>
-<input
-  type="checkbox"
-  id="showVectors"
-  name="showVectors"
-  bind:checked={showVectors}
-  on:change={(e) => {
-    vectorEntities.forEach((i) => {
-      i.show = showVectors;
-    });
-  }}
-/>
-<br />
-<label for="showInterpolatedVectors">Show interpolated vectors</label>
-<input
-  type="checkbox"
-  id="showInterpolatedVectors"
-  name="showInterpolatedVectors"
-  bind:checked={showInterpolatedVectors}
-  on:change={(e) => {
-    interpolatedVectorEntities.forEach((i) => {
-      i.show = showInterpolatedVectors;
-    });
-  }}
-/>
-<br />
-<label for="showPath">Show path</label>
-<input
-  type="checkbox"
-  id="showPath"
-  name="showPath"
-  bind:checked={showPath}
-  on:change={(e) => {
-    entity.path.show = showPath;
-  }}
-/>
-<br />
-Scale <input type="range" min="1" max="100" bind:value={scale} />
-<br />
-<h4>Sample Ardupilot bin files</h4>
-<a
-  href="https://ardupilotvg.s3.ap-southeast-2.amazonaws.com/2024-06-02+16-18-30.bin"
-  >2024-06-02 16-18-30.bin</a
->
+<div style="width: 100%;">
+  Pitch offset
+  <input type="range" min="-30" max="30" step="0.1" bind:value={pitchOffset} />
+  {pitchOffset}
+  <br />
+  Altitude offset
+  <input
+    type="range"
+    min="-200"
+    max="200"
+    step="0.1"
+    bind:value={altitudeOffset}
+  />
+  {altitudeOffset}
+  <br />
+  Scale <input type="range" min="1" max="100" bind:value={scale} />
+  <br />
+  <h4>Sample Ardupilot bin files</h4>
+  <a href="https://ardupilotvg.s3.ap-southeast-2.amazonaws.com/00000006.BIN"
+    >00000006.BIN</a
+  >
+  <br />
+  <a
+    href="https://ardupilotvg.s3.ap-southeast-2.amazonaws.com/2024-06-02+16-18-30.bin"
+    >2024-06-02 16-18-30.bin</a
+  >
+</div>
