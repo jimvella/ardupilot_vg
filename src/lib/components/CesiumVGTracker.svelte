@@ -808,7 +808,6 @@
   let interpolatedVectorEntities: Entity[] = [];
 
   let showSamples = false;
-  let showVectors = false;
 
   let samples = 0;
   let totalSamples = 0;
@@ -967,6 +966,19 @@ Samples: {samples} / {totalSamples}
         if (accelerationEntity) {
           accelerationEntity.show = showAcceleration;
         }
+      }}
+    />
+    <br />
+    <label for="showPath">Show samples</label>
+    <input
+      type="checkbox"
+      id="showPath"
+      name="showPath"
+      bind:checked={showSamples}
+      on:change={(e) => {
+        sampleEntities.forEach((i) => {
+          i.show = showSamples;
+        });
       }}
     />
     <br />
