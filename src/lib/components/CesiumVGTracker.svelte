@@ -957,7 +957,7 @@ Samples: {samples} / {totalSamples}
       }}
     />
     <br />
-    <label for="showPath">Show accelaration</label>
+    <label for="showPath">Show acceleration</label>
     <input
       type="checkbox"
       id="showPath"
