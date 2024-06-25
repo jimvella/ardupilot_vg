@@ -110,7 +110,10 @@
         { x: 0, y: 1 },
         { x: Number(_vne), y: 1 },
       ],
-      backgroundColor: "rgb(255, 99, 132)",
+      //backgroundColor: "rgb(255, 99, 132)",
+      backgroundColor: "rgb(0, 0, 0, 0.5)",
+      borderColor: "rgb(0, 0, 0, 0.5)",
+      borderWidth: 1,
       datalabels: {
         labels: {
           title: null,
@@ -333,9 +336,9 @@
       data: {
         datasets: [
           aircraftDataset(tas, g),
+          oneGDataset(vne),
           vSpeedsDataset(vs, gLimitPositive, vno, vne),
           aircraftHistoricalDataset($vgSamples, new JulianDate()),
-          oneGDataset(vne),
           vnoDataset(vno, vne, gLimitPositive),
           vnoDatasetNegative(vno, vne, gLimitNegative),
           vsPositiveDataset(vs, gLimitPositive, vne, vno),
