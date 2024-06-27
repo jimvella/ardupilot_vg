@@ -1,3 +1,8 @@
+<script lang="ts">
+  import cover_off from "$lib/images/cover_off.jpg";
+  import aircraft_mounting from "$lib/images/aircraft_mounting.jpg";
+</script>
+
 <h1>Drone autopilot flight logging</h1>
 <h2 style="margin-top: -1em;">
   For aerobatic and loss of control training flights
@@ -41,11 +46,26 @@
 </p>
 
 <h2>CubePilot Hardware</h2>
-A suggested configuration is the Cube Orange+, Mini Carrier Board, and Here4 GPS
-(roughly $1000 AUD).
+<p>
+  A suggested configuration is the <a
+    href="https://docs.cubepilot.org/user-guides/autopilot/the-cube-module-overview"
+    >Cube Orange+</a
+  >,
+  <a
+    href="https://docs.cubepilot.org/user-guides/carrier-boards/mini-carrier-board"
+    >Mini Carrier Board</a
+  >, and
+  <a href="https://docs.cubepilot.org/user-guides/here-4/here-4-manual"
+    >Here4 GPS</a
+  >
+  (roughly $1000 AUD).
+</p>
+
+<img src={cover_off} />
 
 <h2>Aircraft Mounting</h2>
-TODO
+<p>Velcroed to the dash.</p>
+<img src={aircraft_mounting} />
 
 <h2>Analysing Logs</h2>
 <p>
