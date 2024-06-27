@@ -6,15 +6,15 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		
 		<link href="./_app/immutable/assets/0.CMEj8eGe.css" rel="stylesheet">
-		<link rel="modulepreload" href="./_app/immutable/entry/start.CFsJbSYo.js">
-		<link rel="modulepreload" href="./_app/immutable/chunks/entry.Dts9NmAd.js">
-		<link rel="modulepreload" href="./_app/immutable/chunks/scheduler.CwdQ81Uq.js">
-		<link rel="modulepreload" href="./_app/immutable/chunks/index.CCFq7Fbk.js">
-		<link rel="modulepreload" href="./_app/immutable/entry/app.C6mOKUh0.js">
+		<link rel="modulepreload" href="./_app/immutable/entry/start.tAYhfCbV.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/entry.DOkNiAHL.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/scheduler.IibRRUQx.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/index.JbBqBuA-.js">
+		<link rel="modulepreload" href="./_app/immutable/entry/app.C0p7OShU.js">
 		<link rel="modulepreload" href="./_app/immutable/chunks/preload-helper.D6kgxu3v.js">
-		<link rel="modulepreload" href="./_app/immutable/chunks/index.1IzXDl8J.js">
-		<link rel="modulepreload" href="./_app/immutable/nodes/0.Bj5AraxN.js">
-		<link rel="modulepreload" href="./_app/immutable/nodes/4.SP7zXcVz.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/index.BfRt5rw7.js">
+		<link rel="modulepreload" href="./_app/immutable/nodes/0.DptTkyy2.js">
+		<link rel="modulepreload" href="./_app/immutable/nodes/4.C3uH7HRT.js">
 	</head>
 	<body data-sveltekit-preload-data="hover">
 		<div style="display: contents">  <div class="app svelte-17zjd7l"><header class="svelte-17efkyt"></header> <main class="svelte-17zjd7l"><h1 data-svelte-h="svelte-u9hmnc">Drone autopilot flight logging</h1> <h2 style="margin-top: -1em;" data-svelte-h="svelte-qzzjml">For aerobatic and loss of control training flights</h2> <p data-svelte-h="svelte-1i5qsut">A technical ecosystem and collective experience in the form of open source
@@ -30,14 +30,10 @@
   designed for the BlackBox logger usecase. Note this is a build time option, but
   there is a
   <a href="https://ardupilot.org/plane/docs/common-blackboxlogger.html">community build server</a> available for building.</p> <p data-svelte-h="svelte-14wr4ku">* In ArduPilot nomenclature &#39;firmware&#39; means software that runs on the drone -
-  as opposed to software that runs on the ground station.</p> <h2 data-svelte-h="svelte-ymxlht">CubePilot Hardware</h2>
-A suggested configuration is the Cube Orange+, Mini Carrier Board, and Here4 GPS
-(roughly $1000 AUD).
-
-<h2 data-svelte-h="svelte-8i2ghh">Aircraft Mounting</h2>
-TODO
-
-<h2 data-svelte-h="svelte-1u1zftf">Analysing Logs</h2> <p data-svelte-h="svelte-1csnpts">The <a href="https://ardupilot.org/plane/docs/common-logs.html">logs</a>
+  as opposed to software that runs on the ground station.</p> <h2 data-svelte-h="svelte-ymxlht">CubePilot Hardware</h2> <p data-svelte-h="svelte-4wavx6">A suggested configuration is the <a href="https://docs.cubepilot.org/user-guides/autopilot/the-cube-module-overview">Cube Orange+</a>,
+  <a href="https://docs.cubepilot.org/user-guides/carrier-boards/mini-carrier-board">Mini Carrier Board</a>, and
+  <a href="https://docs.cubepilot.org/user-guides/here-4/here-4-manual">Here4 GPS</a>
+  (roughly $1000 AUD).</p> <img src="/_app/immutable/assets/cover_off.dGScyJ_-.jpg"> <h2 data-svelte-h="svelte-8i2ghh">Aircraft Mounting</h2> <p data-svelte-h="svelte-6u9e32">Velcroed to the dash.</p> <img src="/_app/immutable/assets/aircraft_mounting.WaNuewrb.jpg"> <h2 data-svelte-h="svelte-1u1zftf">Analysing Logs</h2> <p data-svelte-h="svelte-1csnpts">The <a href="https://ardupilot.org/plane/docs/common-logs.html">logs</a>
   recorded by the autopilot are called Dataflash logs and can be identified by the
   &#39;.bin&#39; file extention. The easiest way to review ArduPilot logs is the web based
   <a href="https://plot.ardupilot.org/#/">UAV Log Viewer</a> application.
@@ -46,7 +42,7 @@ TODO
 			
 			<script>
 				{
-					__sveltekit_rmfks = {
+					__sveltekit_mckatu = {
 						base: new URL(".", location).pathname.slice(0, -1)
 					};
 
@@ -55,8 +51,8 @@ TODO
 					const data = [null,null];
 
 					Promise.all([
-						import("./_app/immutable/entry/start.CFsJbSYo.js"),
-						import("./_app/immutable/entry/app.C6mOKUh0.js")
+						import("./_app/immutable/entry/start.tAYhfCbV.js"),
+						import("./_app/immutable/entry/app.C0p7OShU.js")
 					]).then(([kit, app]) => {
 						kit.start(app, element, {
 							node_ids: [0, 4],
