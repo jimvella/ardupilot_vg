@@ -145,6 +145,12 @@
       interpolationDegree: 5,
     });
 
+    const sampledTemperatureAndPresure = new SampledProperty(Cartesian2);
+    sampledTemperatureAndPresure.setInterpolationOptions({
+      interpolationAlgorithm: LagrangePolynomialApproximation,
+      interpolationDegree: 5,
+    });
+
     let start: JulianDate;
     let stop: JulianDate;
 
@@ -165,6 +171,30 @@
 
     let zmin = 0;
     let zmax = 0;
+
+    yieldingLoop(
+      data.messages["BARO[0]"].time_boot_ms.length,
+      100,
+      (i) => {
+        const t = JulianDate.fromDate(
+          new Date(
+            data.messages["BARO[0]"].time_boot_ms[i] +
+              data.metadata.startTime.getTime()
+          )
+        );
+
+        sampledTemperatureAndPresure.addSample(
+          t,
+          Cartesian2.fromElements(
+            data.messages["BARO[0]"].Temp[i],
+            data.messages["BARO[0]"].Press[i]
+          )
+        );
+      },
+      () => {
+        console.log("BARO samples completed");
+      }
+    );
 
     yieldingLoop(
       length,
@@ -457,6 +487,37 @@
         });
         interpolatedVectorEntities.push(orientationEntity);
 
+        // let orientationEntity2 = viewer.entities.add({
+        //   position: sampledPositionPropertyWithAltOffset,
+        //   show: true,
+        //   polyline: new PolylineGraphics({
+        //     positions: new CallbackProperty((t) => {
+        //       const p = sampledPositionPropertyWithAltOffset.getValue(t);
+
+        //       let transform = new Matrix4();
+        //       Transforms.eastNorthUpToFixedFrame(p, Ellipsoid.WGS84, transform);
+
+        //       const v = Cartesian3.multiplyByScalar(
+        //         Matrix4.multiplyByPointAsVector(
+        //           transform,
+        //           Cartesian3.fromElements(0, 0, 20),
+        //           new Cartesian3()
+        //         ),
+        //         scale,
+        //         new Cartesian3()
+        //       );
+        //       if (p && v) {
+        //         return [p, Cartesian3.add(p, v, new Cartesian3())];
+        //       } else {
+        //         return undefined;
+        //       }
+        //     }, false),
+        //     width: 3,
+        //     material: Color.BLUEVIOLET,
+        //   }),
+        // });
+        // interpolatedVectorEntities.push(orientationEntity2);
+
         windEntity = viewer.entities.add({
           position: sampledPositionPropertyWithAltOffset,
           show: false,
@@ -536,6 +597,12 @@
         viewer.clock.onTick.addEventListener((clock) => {
           const knotsPerMetersPerSecond = 1.944;
 
+          {
+            const c = sampledTemperatureAndPresure.getValue(clock.currentTime);
+            temperature = c.x;
+            pressure = c.y;
+          }
+
           const sv = sampledVelocityProperty.getValue(clock.currentTime);
           if (sv) {
             velocity = Cartesian3.magnitude(sv) * knotsPerMetersPerSecond;
@@ -559,6 +626,26 @@
             roll = so.z;
           }
 
+          // For climb angles
+          let transform = new Matrix4();
+          Transforms.eastNorthUpToFixedFrame(
+            sampledPositionPropertyWithAltOffset.getValue(clock.currentTime),
+            Ellipsoid.WGS84,
+            transform
+          );
+          const upVector = Matrix4.multiplyByPointAsVector(
+            transform,
+            Cartesian3.fromElements(0, 0, 20),
+            new Cartesian3()
+          );
+
+          try {
+            climbAngle =
+              90 - (Cartesian3.angleBetween(sv, upVector) * 180) / Math.PI;
+          } catch (error) {
+            //console.log("error calculating aoa", error);
+          }
+
           // aoa
           {
             // relative wind
@@ -568,6 +655,16 @@
               sampledWindProperty.getValue(clock.currentTime),
               new Cartesian3()
             );
+
+            try {
+              relativeWindClimbAngle =
+                90 -
+                (Cartesian3.angleBetween(relativeWind, upVector) * 180) /
+                  Math.PI;
+            } catch (error) {
+              //console.log("error calculating aoa", error);
+            }
+
             const planeBasisVectors: [Cartesian3, Cartesian3] = [
               // londitudinal axis
               Cartesian3.multiplyByScalar(
@@ -827,6 +924,13 @@
   let aoa = 0;
   let incline = 0;
 
+  // The Bootstrap approach
+  // https://commons.erau.edu/cgi/viewcontent.cgi?article=1167&context=jaaer
+  let climbAngle = 0;
+  let relativeWindClimbAngle = 0;
+  let temperature = 0;
+  let pressure = 0;
+
   let orientationEntity = undefined;
   let velocityEntity = undefined;
   let windEntity = undefined;
@@ -898,6 +1002,15 @@ Samples: {samples} / {totalSamples}
     ay (m/s^2): {ay.toFixed(1)}
     <br />
     az (m/s^2): {az.toFixed(1)}
+    <br />
+    <br />
+    Climb angle (deg): {climbAngle.toFixed(1)}
+    <br />
+    Relative wind climb angle (deg): {relativeWindClimbAngle.toFixed(1)}
+    <br />
+    Temperature (C): {temperature.toFixed(1)}
+    <br />
+    Pressure (kPa): {(pressure / 1000).toFixed(1)}
     <br />
   </div>
   <div style={"margin-left: 50%;"}>

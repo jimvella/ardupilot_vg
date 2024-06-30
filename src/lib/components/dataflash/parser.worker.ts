@@ -27,6 +27,8 @@ self.addEventListener("message", function (event) {
       "EV",
       // Not sure why these aren't extracted by default
       // https://github.com/ArduPilot/UAVLogViewer/blob/e67fa69dc0d400fb8aa1987c39ca19b75a5572c2/src/tools/parsers/parser.worker.js#L17
+      "BARO",
+      "HYGR",
       "IMU",
       "XKF1",
       "XKF2",
