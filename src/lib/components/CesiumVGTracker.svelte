@@ -599,8 +599,10 @@
 
           {
             const c = sampledTemperatureAndPresure.getValue(clock.currentTime);
-            temperature = c.x;
-            pressure = c.y;
+            if (c) {
+              temperature = c.x;
+              pressure = c.y;
+            }
           }
 
           const sv = sampledVelocityProperty.getValue(clock.currentTime);
